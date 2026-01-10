@@ -51,10 +51,10 @@ def slerp(v1, v2, t, DOT_THRESHOLD=0.9995):
 
     # calculate the angle between the vectors
     theta = torch.acos(dot) * t
-    v3 = v2 - dot * v1
+    v3 = v2 - dot.unsqueeze(-1) * v1
     v3 = v3 / torch.norm(v3, p=2, dim=-1, keepdim=True)
     
-    return (torch.cos(theta) * v1) + (torch.sin(theta) * v3)
+    return (torch.cos(theta.unsqueeze(-1)) * v1) + (torch.sin(theta.unsqueeze(-1)) * v3)
 
 
 def save_checkpoint(state, is_best, checkpoint_path, best_checkpoint_path):
