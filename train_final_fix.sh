@@ -3,7 +3,7 @@
 python main.py \
     --mode train \
     --exper-name final_fix_balanced_loss \
-    --gpu mps \
+    --gpu 0 \
     --epochs 50 \
     --batch-size 8 \
     --lr 1e-5 \
