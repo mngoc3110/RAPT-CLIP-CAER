@@ -5,7 +5,7 @@ python main.py \
     --exper-name final_fix_focal_loss_with_sampler \
     --gpu 0 \
     --epochs 50 \
-    --batch-size 8 \
+    --batch-size 16 \
     --lr 1e-5 \
     --lr-image-encoder 0.0 \
     --lr-prompt-learner 1e-5 \
