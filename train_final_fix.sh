@@ -42,8 +42,4 @@ python main.py \
     --slerp-weight 0.0 \
     --temperature 0.07 \
     --label-smoothing 0 \
-    --use-amp False \
-    --class-balanced-loss False \
-    --use-weighted-sampler False \
-    --crop-body True \
     --grad-clip 0.0
