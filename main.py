@@ -192,10 +192,9 @@ def run_training(args: argparse.Namespace) -> None:
     if args.label_smoothing > 0:
         criterion = LSR2(e=args.label_smoothing, label_mode='class_descriptor').to(args.device)
     elif args.class_balanced_loss:
-        print("=> Using class-balanced loss.")
-        class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
-        class_weights = class_weights / class_weights.sum()
-        criterion = nn.CrossEntropyLoss(weight=class_weights.to(args.device)).to(args.device)
+        print("=> Using FocalLoss as the class-balanced loss.")
+        # Using Focal Loss. Alpha can be tuned, 0.25 is a common starting point.
+        criterion = FocalLoss(alpha=0.25, gamma=2).to(args.device)
     else:
         criterion = nn.CrossEntropyLoss().to(args.device)
 
