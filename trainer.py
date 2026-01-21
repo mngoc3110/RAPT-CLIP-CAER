@@ -208,8 +208,12 @@ class Trainer:
         
     def train_epoch(self, train_loader, epoch_num):
         """Executes one full training epoch."""
-        return self._run_one_epoch(train_loader, str(epoch_num), is_train=True)
+        res = self._run_one_epoch(train_loader, str(epoch_num), is_train=True)
+        torch.cuda.empty_cache()
+        return res
     
     def validate(self, val_loader, epoch_num_str="Final"):
         """Executes one full validation run."""
-        return self._run_one_epoch(val_loader, epoch_num_str, is_train=False)
+        res = self._run_one_epoch(val_loader, epoch_num_str, is_train=False)
+        torch.cuda.empty_cache()
+        return res

@@ -192,6 +192,13 @@ class Temporal_Transformer_AttnPool(nn.Module):
             nn.Tanh(),
             nn.Linear(mlp_dim // 2, 1)
         )
+        
+        # Initialize attention pool weights
+        for m in self.attention_pool.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         # x shape: (batch_size, num_segments, input_dim) -> (B, 16, 512)

@@ -1,17 +1,19 @@
 #!/bin/bash
 
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 python main.py \
   --mode train \
-  --exper-name final_AttnPool_LDL_MoCo_UAR70 \
+  --exper-name final_AttnPool_LDL_MoCo_2048_WD5e4_LR1e5 \
   --gpu 0 \
   --epochs 60 \
-  --batch-size 16 \
+  --batch-size 8 \
   --optimizer AdamW \
-  --lr 1e-4 \
+  --lr 1e-5 \
   --lr-image-encoder 1e-6 \
   --lr-prompt-learner 5e-4 \
   --lr-adapter 1e-4 \
-  --weight-decay 0.0001 \
+  --weight-decay 0.0005 \
   --milestones 25 45 \
   --gamma 0.1 \
   --temporal-layers 1 \
@@ -21,8 +23,8 @@ python main.py \
   --seed 42 \
   --print-freq 10 \
   --root-dir /kaggle/input/raer-video-emotion-dataset \
-  --train-annotation /kaggle/input/raer-annot/annotation/train_80.txt \
-  --val-annotation /kaggle/input/raer-annot/annotation/val_20.txt \
+  --train-annotation /kaggle/input/raer-annot/annotation/train.txt \
+  --val-annotation /kaggle/input/raer-annot/annotation/test.txt \
   --test-annotation /kaggle/input/raer-annot/annotation/test.txt \
   --clip-path ViT-B/32 \
   --bounding-box-face /kaggle/input/raer-video-emotion-dataset/RAER/bounding_box/face.json \
@@ -43,7 +45,7 @@ python main.py \
   --use-ldl \
   --ldl-temperature 1.0 \
   --use-moco \
-  --moco-k 4096 \
+  --moco-k 2048 \
   --moco-m 0.99 \
   --use-amp \
   --use-weighted-sampler \
