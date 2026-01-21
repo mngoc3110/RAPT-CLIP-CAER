@@ -5,7 +5,7 @@ python main.py \
   --exper-name final_AttnPool_LDL_MoCo_UAR70 \
   --gpu 0 \
   --epochs 60 \
-  --batch-size 8 \
+  --batch-size 16 \
   --optimizer AdamW \
   --lr 1e-4 \
   --lr-image-encoder 1e-6 \
@@ -21,8 +21,8 @@ python main.py \
   --seed 42 \
   --print-freq 10 \
   --root-dir /kaggle/input/raer-video-emotion-dataset \
-  --train-annotation /kaggle/input/raer-annot/annotation/train.txt \
-  --val-annotation /kaggle/input/raer-annot/annotation/test.txt \
+  --train-annotation /kaggle/input/raer-annot/annotation/train_80.txt \
+  --val-annotation /kaggle/input/raer-annot/annotation/val_20.txt \
   --test-annotation /kaggle/input/raer-annot/annotation/test.txt \
   --clip-path ViT-B/32 \
   --bounding-box-face /kaggle/input/raer-video-emotion-dataset/RAER/bounding_box/face.json \
