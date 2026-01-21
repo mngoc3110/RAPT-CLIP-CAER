@@ -4,12 +4,12 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python main.py \
   --mode train \
-  --exper-name Stabilize_PromptLR2e4_Ctx8_MIWarm5_Mixup02 \
+  --exper-name A100_AttnPool_LDL_MoCo4096_BS16_LR2e5 \
   --gpu 0 \
   --epochs 60 \
-  --batch-size 8 \
+  --batch-size 16 \
   --optimizer AdamW \
-  --lr 1e-5 \
+  --lr 2e-5 \
   --lr-image-encoder 1e-6 \
   --lr-prompt-learner 2e-4 \
   --lr-adapter 1e-4 \
@@ -23,8 +23,8 @@ python main.py \
   --seed 42 \
   --print-freq 10 \
   --root-dir /kaggle/input/raer-video-emotion-dataset \
-  --train-annotation /kaggle/input/raer-annot/annotation/train.txt \
-  --val-annotation /kaggle/input/raer-annot/annotation/test.txt \
+  --train-annotation /kaggle/input/raer-annot/annotation/train_80.txt \
+  --val-annotation /kaggle/input/raer-annot/annotation/val_20.txt \
   --test-annotation /kaggle/input/raer-annot/annotation/test.txt \
   --clip-path ViT-B/32 \
   --bounding-box-face /kaggle/input/raer-video-emotion-dataset/RAER/bounding_box/face.json \
@@ -45,7 +45,7 @@ python main.py \
   --use-ldl \
   --ldl-temperature 1.0 \
   --use-moco \
-  --moco-k 2048 \
+  --moco-k 4096 \
   --moco-m 0.99 \
   --use-amp \
   --use-weighted-sampler \
