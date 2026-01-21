@@ -4,7 +4,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python main.py \
   --mode train \
-  --exper-name Stabilize_PromptLR2e4_Ctx8_MIWarm5 \
+  --exper-name Stabilize_PromptLR2e4_Ctx8_MIWarm5_Mixup02 \
   --gpu 0 \
   --epochs 60 \
   --batch-size 8 \
@@ -50,4 +50,5 @@ python main.py \
   --use-amp \
   --use-weighted-sampler \
   --crop-body \
-  --grad-clip 1.0
+  --grad-clip 1.0 \
+  --mixup-alpha 0.2

@@ -17,7 +17,7 @@ class Trainer:
                  dc_criterion=None, lambda_dc=0,
                  class_priors=None, logit_adj_tau=1.0,
                  mi_warmup=0, mi_ramp=0,
-                 dc_warmup=0, dc_ramp=0, use_amp=False, grad_clip=1.0):
+                 dc_warmup=0, dc_ramp=0, use_amp=False, grad_clip=1.0, mixup_alpha=0.0):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
@@ -37,6 +37,7 @@ class Trainer:
         self.dc_ramp = dc_ramp
         self.use_amp = use_amp
         self.grad_clip = grad_clip
+        self.mixup_alpha = mixup_alpha
         if self.use_amp:
             self.scaler = torch.cuda.amp.GradScaler()
         
@@ -64,6 +65,19 @@ class Trainer:
         # Save the image
         torchvision.utils.save_image(tensor, filepath)
 
+    def mixup_data(self, x1, x2, alpha=1.0):
+        '''Returns mixed inputs, pairs of targets, and lambda'''
+        if alpha > 0:
+            lam = np.random.beta(alpha, alpha)
+        else:
+            lam = 1
+
+        batch_size = x1.size(0)
+        index = torch.randperm(batch_size).to(self.device)
+
+        mixed_x1 = lam * x1 + (1 - lam) * x1[index, :]
+        mixed_x2 = lam * x2 + (1 - lam) * x2[index, :]
+        return mixed_x1, mixed_x2, index, lam
 
     def _run_one_epoch(self, loader, epoch_str, is_train=True):
         """Runs one epoch of training or validation."""
@@ -108,6 +122,10 @@ class Trainer:
                 images_face = images_face.to(self.device)
                 images_body = images_body.to(self.device)
                 target = target.to(self.device)
+                
+                # Apply Mixup
+                if is_train and self.mixup_alpha > 0:
+                    images_face, images_body, target_b, lam = self.mixup_data(images_face, images_body, self.mixup_alpha)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     # Forward pass
@@ -127,9 +145,16 @@ class Trainer:
 
                     # Calculate loss
                     if isinstance(self.criterion, SemanticLDLLoss):
-                        classification_loss = self.criterion(output, target, processed_learnable_text_features)
+                        if is_train and self.mixup_alpha > 0:
+                            classification_loss = lam * self.criterion(output, target, processed_learnable_text_features) + \
+                                                  (1 - lam) * self.criterion(output, target_b, processed_learnable_text_features)
+                        else:
+                            classification_loss = self.criterion(output, target, processed_learnable_text_features)
                     else:
-                        classification_loss = self.criterion(output, target)
+                        if is_train and self.mixup_alpha > 0:
+                            classification_loss = lam * self.criterion(output, target) + (1 - lam) * self.criterion(output, target_b)
+                        else:
+                            classification_loss = self.criterion(output, target)
                     loss = classification_loss
 
                     if is_train and self.mi_criterion is not None:

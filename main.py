@@ -93,6 +93,7 @@ loss_group.add_argument('--use-weighted-sampler', action='store_true', help='Use
 loss_group.add_argument('--label-smoothing', type=float, default=0.05, help='Label smoothing factor.')
 loss_group.add_argument('--use-ldl', action='store_true', help='Use Semantic Label Distribution Learning (LDL) Loss.')
 loss_group.add_argument('--ldl-temperature', type=float, default=1.0, help='Temperature for LDL target distribution.')
+loss_group.add_argument('--mixup-alpha', type=float, default=0.0, help='Alpha value for Mixup data augmentation. Set to 0.0 to disable.')
 
 # --- Model & Input ---
 model_group = parser.add_argument_group('Model & Input', 'Parameters for model architecture and data handling')
