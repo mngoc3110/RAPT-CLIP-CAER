@@ -15,7 +15,6 @@ class Trainer:
     def __init__(self, model, criterion, optimizer, scheduler, device,log_txt_path, 
                  mi_criterion=None, lambda_mi=0, 
                  dc_criterion=None, lambda_dc=0,
-                 class_priors=None, logit_adj_tau=1.0,
                  mi_warmup=0, mi_ramp=0,
                  dc_warmup=0, dc_ramp=0, use_amp=False, grad_clip=1.0, mixup_alpha=0.0):
         self.model = model
@@ -29,8 +28,6 @@ class Trainer:
         self.lambda_mi = lambda_mi
         self.dc_criterion = dc_criterion
         self.lambda_dc = lambda_dc
-        self.class_priors = class_priors
-        self.logit_adj_tau = logit_adj_tau
         self.mi_warmup = mi_warmup
         self.mi_ramp = mi_ramp
         self.dc_warmup = dc_warmup
@@ -151,10 +148,6 @@ class Trainer:
                         num_prompts_per_class = self.model.num_prompts_per_class
                         # Reshape from (C*P, D) to (C, P, D) and then average over P
                         processed_learnable_text_features = learnable_text_features.view(num_classes, num_prompts_per_class, -1).mean(dim=1)
-
-                    # Apply logit adjustment
-                    if self.class_priors is not None and is_train:
-                        output = output + self.logit_adj_tau * torch.log(self.class_priors + 1e-12)
 
                     # Calculate loss
                     if isinstance(self.criterion, SemanticLDLLoss):

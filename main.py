@@ -42,64 +42,61 @@ exp_group.add_argument('--mode', type=str, default='train', choices=['train', 'e
                        help="Execution mode: 'train' for a full training run, 'eval' for evaluation only.")
 exp_group.add_argument('--eval-checkpoint', type=str,
                        help="Path to the model checkpoint for evaluation mode (e.g., outputs/exp_name/model_best.pth).")
-exp_group.add_argument('--exper-name', type=str, default='test', help='A name for the experiment to create a unique output folder.')
+exp_group.add_argument('--exper-name', type=str, default='Train', help='A name for the experiment to create a unique output folder.')
 exp_group.add_argument('--dataset', type=str, default='RAER', help='Name of the dataset to use.')
-exp_group.add_argument('--gpu', type=str, default='0', help='ID of the GPU to use (e.g., 0, 1) or "mps" for Apple Silicon.')
+exp_group.add_argument('--gpu', type=str, default='mps', help='ID of the GPU to use (e.g., 0, 1) or "mps" for Apple Silicon.')
 exp_group.add_argument('--workers', type=int, default=4, help='Number of data loading workers.')
 exp_group.add_argument('--seed', type=int, default=42, help='Random seed for reproducibility.')
 
 # --- Data & Path ---
 path_group = parser.add_argument_group('Data & Path', 'Paths to datasets and pretrained models')
-path_group.add_argument('--root-dir', type=str, help='Root directory of the dataset. E.g., /kaggle/input/raer-video-emotion-dataset/RAER')
-path_group.add_argument('--train-annotation', type=str, help='Absolute path to training annotation file. E.g., /kaggle/input/raer-annot/annotation/train_abs.txt')
-path_group.add_argument('--val-annotation', type=str, help='Absolute path to validation annotation file. E.g., /kaggle/input/raer-annot/annotation/val_20.txt')
-path_group.add_argument('--test-annotation', type=str, help='Absolute path to testing annotation file. E.g., /kaggle/input/raer-annot/annotation/test_abs.txt')
-path_group.add_argument('--clip-path', type=str, help='Path to the pretrained CLIP model.')
-path_group.add_argument('--bounding-box-face', type=str, help='Absolute path to face bounding box JSON. E.g., /kaggle/input/raer-annot/annotation/bounding_box/face_abs.json')
-path_group.add_argument('--bounding-box-body', type=str, help='Absolute path to body bounding box JSON. E.g., /kaggle/input/raer-annot/annotation/bounding_box/body_abs.json')
+path_group.add_argument('--root-dir', type=str, default='./', help='Root directory of the dataset. E.g., /kaggle/input/raer-video-emotion-dataset/RAER')
+path_group.add_argument('--train-annotation', type=str, default='RAER/annotation/train_80.txt', help='Absolute path to training annotation file. E.g., /kaggle/input/raer-annot/annotation/train_abs.txt')
+path_group.add_argument('--val-annotation', type=str, default='RAER/annotation/val_20.txt', help='Absolute path to validation annotation file. E.g., /kaggle/input/raer-annot/annotation/val_20.txt')
+path_group.add_argument('--test-annotation', type=str, default='RAER/annotation/test.txt', help='Absolute path to testing annotation file. E.g., /kaggle/input/raer-annot/annotation/test_abs.txt')
+path_group.add_argument('--clip-path', type=str, default='ViT-B/16', help='Path to the pretrained CLIP model.')
+path_group.add_argument('--bounding-box-face', type=str, default='RAER/bounding_box/face.json', help='Absolute path to face bounding box JSON. E.g., /kaggle/input/raer-annot/annotation/bounding_box/face_abs.json')
+path_group.add_argument('--bounding-box-body', type=str, default='RAER/bounding_box/body.json', help='Absolute path to body bounding box JSON. E.g., /kaggle/input/raer-annot/annotation/bounding_box/body_abs.json')
 
 # --- Training Control ---
 train_group = parser.add_argument_group('Training Control', 'Parameters to control the training process')
-train_group.add_argument('--epochs', type=int, default=50, help='Total number of training epochs.')
-train_group.add_argument('--batch-size', type=int, default=8, help='Batch size for training and validation.')
+train_group.add_argument('--epochs', type=int, default=20, help='Total number of training epochs.')
+train_group.add_argument('--batch-size', type=int, default=4, help='Batch size for training and validation.')
 train_group.add_argument('--print-freq', type=int, default=10, help='Frequency of printing training logs.')
 train_group.add_argument('--use-amp', action='store_true', help='Use Automatic Mixed Precision.')
 train_group.add_argument('--grad-clip', type=float, default=1.0, help='Gradient clipping value.')
 
 # --- Optimizer & Learning Rate ---
 optim_group = parser.add_argument_group('Optimizer & LR', 'Hyperparameters for the optimizer and scheduler')
-optim_group.add_argument('--optimizer', type=str, default='SGD', choices=['SGD', 'AdamW'], help='The optimizer to use (SGD or AdamW).')
-optim_group.add_argument('--lr', type=float, default=1e-5, help='Initial learning rate for main modules (temporal, project_fc).')
-optim_group.add_argument('--lr-image-encoder', type=float, default=0.0, help='Learning rate for the image encoder part (set to 0 to freeze).')
-optim_group.add_argument('--lr-prompt-learner', type=float, default=1e-5, help='Learning rate for the prompt learner.')
-optim_group.add_argument('--lr-adapter', type=float, default=1e-5, help='Learning rate for the adapter.')
-optim_group.add_argument('--weight-decay', type=float, default=0.0001, help='Weight decay for the optimizer.')
+optim_group.add_argument('--optimizer', type=str, default='AdamW', choices=['SGD', 'AdamW'], help='The optimizer to use (SGD or AdamW).')
+optim_group.add_argument('--lr', type=float, default=2e-5, help='Initial learning rate for main modules (temporal, project_fc).')
+optim_group.add_argument('--lr-image-encoder', type=float, default=1e-6, help='Learning rate for the image encoder part (set to 0 to freeze).')
+optim_group.add_argument('--lr-prompt-learner', type=float, default=2e-4, help='Learning rate for the prompt learner.')
+optim_group.add_argument('--lr-adapter', type=float, default=1e-4, help='Learning rate for the adapter.')
+optim_group.add_argument('--weight-decay', type=float, default=0.0005, help='Weight decay for the optimizer.')
 optim_group.add_argument('--momentum', type=float, default=0.9, help='Momentum for the SGD optimizer.')
-optim_group.add_argument('--milestones', nargs='+', type=int, default=[20, 35], help='Epochs at which to decay the learning rate.')
+optim_group.add_argument('--milestones', nargs='+', type=int, default=[10, 15], help='Epochs at which to decay the learning rate.')
 optim_group.add_argument('--gamma', type=float, default=0.1, help='Factor for learning rate decay.')
 
 # --- Loss & Imbalance Handling ---
 loss_group = parser.add_argument_group('Loss & Imbalance Handling', 'Parameters for loss functions and imbalance handling')
-loss_group.add_argument('--lambda_mi', type=float, default=0.7, help='Weight for the Mutual Information loss.')
-loss_group.add_argument('--lambda_dc', type=float, default=1.2, help='Weight for the Decorrelation loss.')
+loss_group.add_argument('--lambda_mi', type=float, default=0.1, help='Weight for the Mutual Information loss.')
+loss_group.add_argument('--lambda_dc', type=float, default=0.1, help='Weight for the Decorrelation loss.')
 loss_group.add_argument('--mi-warmup', type=int, default=5, help='Warmup epochs for MI loss.')
-loss_group.add_argument('--mi-ramp', type=int, default=8, help='Ramp-up epochs for MI loss.')
+loss_group.add_argument('--mi-ramp', type=int, default=10, help='Ramp-up epochs for MI loss.')
 loss_group.add_argument('--dc-warmup', type=int, default=5, help='Warmup epochs for DC loss.')
 loss_group.add_argument('--dc-ramp', type=int, default=10, help='Ramp-up epochs for DC loss.')
-loss_group.add_argument('--class-balanced-loss', action='store_true', help='Use class-balanced loss.')
-loss_group.add_argument('--logit-adj', action='store_true', help='Use logit adjustment.')
-loss_group.add_argument('--logit-adj-tau', type=float, default=0.5, help='Temperature for logit adjustment.')
 loss_group.add_argument('--use-weighted-sampler', action='store_true', help='Use WeightedRandomSampler.')
 loss_group.add_argument('--label-smoothing', type=float, default=0.05, help='Label smoothing factor.')
 loss_group.add_argument('--use-ldl', action='store_true', help='Use Semantic Label Distribution Learning (LDL) Loss.')
 loss_group.add_argument('--ldl-temperature', type=float, default=1.0, help='Temperature for LDL target distribution.')
-loss_group.add_argument('--mixup-alpha', type=float, default=0.0, help='Alpha value for Mixup data augmentation. Set to 0.0 to disable.')
+loss_group.add_argument('--mixup-alpha', type=float, default=0.2, help='Alpha value for Mixup data augmentation. Set to 0.0 to disable.')
 
 # --- Model & Input ---
 model_group = parser.add_argument_group('Model & Input', 'Parameters for model architecture and data handling')
-model_group.add_argument('--text-type', default='class_descriptor', choices=['class_names', 'class_names_with_context', 'class_descriptor', 'prompt_ensemble'], help='Type of text prompts to use.')
+model_group.add_argument('--text-type', default='prompt_ensemble', choices=['class_names', 'class_names_with_context', 'class_descriptor', 'prompt_ensemble'], help='Type of text prompts to use.')
 model_group.add_argument('--temporal-layers', type=int, default=1, help='Number of layers in the temporal modeling part.')
-model_group.add_argument('--contexts-number', type=int, default=12, help='Number of context vectors in the prompt learner.')
+model_group.add_argument('--contexts-number', type=int, default=8, help='Number of context vectors in the prompt learner.')
 model_group.add_argument('--class-token-position', type=str, default="end", help='Position of the class token in the prompt.')
 model_group.add_argument('--class-specific-contexts', type=str, default='True', choices=['True', 'False'], help='Whether to use class-specific context prompts.')
 model_group.add_argument('--load_and_tune_prompt_learner', type=str, default='True', choices=['True', 'False'], help='Whether to load and fine-tune the prompt learner.')
@@ -109,8 +106,8 @@ model_group.add_argument('--image-size', type=int, default=224, help='Size to re
 model_group.add_argument('--temperature', type=float, default=0.07, help='Temperature for the classification layer.')
 model_group.add_argument('--crop-body', action='store_true', help='Crop body from the input images.')
 model_group.add_argument('--use-moco', action='store_true', help='Use MoCoRank for training.')
-model_group.add_argument('--moco-k', type=int, default=65536, help='Queue size for MoCo.')
-model_group.add_argument('--moco-m', type=float, default=0.999, help='Momentum for MoCo.')
+model_group.add_argument('--moco-k', type=int, default=4096, help='Queue size for MoCo.')
+model_group.add_argument('--moco-m', type=float, default=0.99, help='Momentum for MoCo.')
 model_group.add_argument('--moco-t', type=float, default=0.07, help='Temperature for MoCo.')
 
 # ==================== Helper Functions ====================
@@ -194,28 +191,16 @@ def run_training(args: argparse.Namespace) -> None:
     print("=> Dataloaders built successfully.")
 
     # Loss and optimizer
-    class_counts = get_class_counts(args.train_annotation)
-    
     if args.use_ldl:
         print(f"=> Using SemanticLDLLoss (LDL) with temperature {args.ldl_temperature}")
         criterion = SemanticLDLLoss(temperature=args.ldl_temperature).to(args.device)
     elif args.label_smoothing > 0:
         criterion = LSR2(e=args.label_smoothing, label_mode='class_descriptor').to(args.device)
-    elif args.class_balanced_loss:
-        print("=> Using FocalLoss as the class-balanced loss.")
-        # Using Focal Loss. Alpha can be tuned, 0.25 is a common starting point.
-        criterion = FocalLoss(alpha=0.25, gamma=2).to(args.device)
     else:
         criterion = nn.CrossEntropyLoss().to(args.device)
 
     mi_criterion = MILoss().to(args.device) if args.lambda_mi > 0 else None
     dc_criterion = DCLoss().to(args.device) if args.lambda_dc > 0 else None
-
-    class_priors = None
-    if args.logit_adj:
-        print("=> Using logit adjustment.")
-        class_priors = torch.tensor(class_counts, dtype=torch.float) / sum(class_counts)
-        class_priors = class_priors.to(args.device)
 
     recorder = RecorderMeter(args.epochs)
     
@@ -239,7 +224,6 @@ def run_training(args: argparse.Namespace) -> None:
     trainer = Trainer(model, criterion, optimizer, scheduler, args.device, log_txt_path, 
                     mi_criterion=mi_criterion, lambda_mi=args.lambda_mi,
                     dc_criterion=dc_criterion, lambda_dc=args.lambda_dc,
-                    class_priors=class_priors, logit_adj_tau=args.logit_adj_tau,
                     mi_warmup=args.mi_warmup, mi_ramp=args.mi_ramp,
                     dc_warmup=args.dc_warmup, dc_ramp=args.dc_ramp, use_amp=args.use_amp, grad_clip=args.grad_clip)
     
