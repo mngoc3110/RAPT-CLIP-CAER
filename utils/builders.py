@@ -61,7 +61,7 @@ def get_class_info(args: argparse.Namespace) -> Tuple[list, list]:
         input_text: 输入文本，用于传入模型
     """
     if args.dataset == "RAER":
-        class_names = ['Neutrality', 'Enjoyment', 'Confusion', 'Fatigue', 'Distraction.']
+        class_names = ['Neutrality', 'Enjoyment', 'Confusion', 'Fatigue', 'Distraction']
         class_names_with_context = class_names_with_context_5
         class_descriptor = class_descriptor_5
         ensemble_prompts = prompt_ensemble_5

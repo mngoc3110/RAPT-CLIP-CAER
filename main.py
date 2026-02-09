@@ -106,7 +106,6 @@ model_group.add_argument('--load_and_tune_prompt_learner', type=str, default='Tr
 model_group.add_argument('--num-segments', type=int, default=16, help='Number of segments to sample from each video.')
 model_group.add_argument('--duration', type=int, default=1, help='Duration of each segment.')
 model_group.add_argument('--image-size', type=int, default=224, help='Size to resize input images to.')
-model_group.add_argument('--slerp-weight', type=float, default=0.5, help='Weight for spherical linear interpolation (IEC).')
 model_group.add_argument('--temperature', type=float, default=0.07, help='Temperature for the classification layer.')
 model_group.add_argument('--crop-body', action='store_true', help='Crop body from the input images.')
 model_group.add_argument('--use-moco', action='store_true', help='Use MoCoRank for training.')

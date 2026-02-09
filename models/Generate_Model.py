@@ -4,7 +4,6 @@ from models.Prompt_Learner import *
 from models.Text import class_descriptor_5_only_face
 from models.Adapter import Adapter
 from clip import clip
-from utils.utils import slerp
 import copy
 import itertools
 
@@ -183,31 +182,16 @@ class GenerateModel(nn.Module):
                 k_video_features = self.forward_momentum(image_face, image_body)
             
             # Compute MoCo Logits
-            # Positive logits: (B, 1) - similarity with own momentum feature (not used typically for text-video, but can be aux)
-            # Negative logits: (B, K) - similarity with queue
-            # Here we want to use the queue to contrast against Text Features? 
-            # OR use the queue to contrast against Video Features?
-            # Standard MoCo: Contrast Query (Video) against Keys (Video Queue)
-            # BUT we are doing Video-Text classification.
-            
-            # Strategy: Use the queue as "Negative Video Prototypes".
-            # The Text Features should match the Current Video, and NOT match the Queue Videos.
-            
-            # (B, D) @ (D, K) -> (B, K)
-            # Similarity between Current Video and Queue Videos (should be low?)
-            # This is "Visual Self-Supervised Learning" part.
-            
-            # Similarity between Text and Queue (should be low?)
-            # (C, D) @ (D, K) -> (C, K). Text vs Negative Videos.
-            
-            # Let's return the queue for the loss function to handle.
+            # Positive logits: similarity between query and key
+            l_pos = torch.einsum('nc,nc->n', [video_features, k_video_features]).unsqueeze(-1)
+            # Negative logits: similarity between query and queue
+            l_neg = torch.einsum('nc,ck->nk', [video_features, self.queue.clone().detach()])
+
+            # logits: Nx(1+K)
+            moco_logits = torch.cat([l_pos, l_neg], dim=1)
+            moco_logits /= self.moco_t
+
             self._dequeue_and_enqueue(k_video_features)
-            
-            # We will return the queue as an extra output if needed, or compute an auxiliary loss here?
-            # Ideally, we return it and let the Loss function handle it, 
-            # BUT our loss function signature is fixed.
-            # Let's attach it to the model instance for now or return it.
-            self.current_queue = self.queue.clone().detach()
 
         ################# Classification ###################
         # Calculate logits
@@ -224,16 +208,7 @@ class GenerateModel(nn.Module):
             # Average the logits across the prompts for each class
             output = torch.mean(logits, dim=2) / self.args.temperature
 
-        elif self.args.slerp_weight > 0:
-            video_features_expanded = video_features.unsqueeze(1).expand(-1, hand_crafted_text_features.shape[0], -1)
-            text_features_expanded = hand_crafted_text_features.unsqueeze(0).expand(video_features.shape[0], -1, -1)
-            
-            instance_enhanced_text_features = slerp(text_features_expanded, video_features_expanded, self.args.slerp_weight)
-            
-            # Take the dot product between the video features and the instance-enhanced text features
-            # We need to do this element-wise for each instance
-            output = torch.einsum('bd,bcd->bc', video_features, instance_enhanced_text_features) / self.args.temperature
         else:
             output = video_features @ text_features.t() / self.args.temperature
 
-        return output, text_features, hand_crafted_text_features
+        return output, text_features, hand_crafted_text_features, moco_logits

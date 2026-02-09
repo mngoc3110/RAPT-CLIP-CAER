@@ -91,6 +91,7 @@ class Trainer:
         losses = AverageMeter('Loss', ':.4e')
         mi_losses = AverageMeter('MI Loss', ':.4e')
         dc_losses = AverageMeter('DC Loss', ':.4e')
+        moco_losses = AverageMeter('MoCo Loss', ':.4e')
         war_meter = AverageMeter('WAR', ':6.2f')
         
         progress_meters = [losses, war_meter]
@@ -98,6 +99,10 @@ class Trainer:
             progress_meters.insert(1, mi_losses)
         if self.dc_criterion is not None:
             progress_meters.insert(2, dc_losses)
+        
+        # Add MoCo loss to progress meter if moco is enabled in model
+        if hasattr(self.model, 'args') and hasattr(self.model.args, 'use_moco') and self.model.args.use_moco:
+            progress_meters.insert(-1, moco_losses)
 
         progress = ProgressMeter(
             len(loader), 
@@ -110,14 +115,22 @@ class Trainer:
         all_targets = []
         saved_images_count = 0
 
+        # Print weights at the start of training epoch
+        if is_train:
+            mi_weight = get_loss_weight(int(epoch_str), self.mi_warmup, self.mi_ramp, self.lambda_mi)
+            dc_weight = get_loss_weight(int(epoch_str), self.dc_warmup, self.dc_ramp, self.lambda_dc)
+            weight_msg = f"--- Loss Weights for Epoch {epoch_str}: MI={mi_weight:.4f}, DC={dc_weight:.4f}, MoCo=1.0000 ---"
+            print(weight_msg)
+            with open(self.log_txt_path, 'a') as f:
+                f.write(weight_msg + '\n')
 
         context = torch.enable_grad() if is_train else torch.no_grad()
         
         with context:
             for i, (images_face, images_body, target) in enumerate(loader):
                 # Debugging: Print batch information
-                if is_train:
-                    print(f"--> Batch {i}, Size: {target.size(0)}, Labels: {target.tolist()}")
+                if is_train and i % 100 == 0:
+                    print(f"--> Batch {i}, Size: {target.size(0)}")
 
                 images_face = images_face.to(self.device)
                 images_body = images_body.to(self.device)
@@ -129,7 +142,7 @@ class Trainer:
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     # Forward pass
-                    output, learnable_text_features, hand_crafted_text_features = self.model(images_face, images_body)
+                    output, learnable_text_features, hand_crafted_text_features, moco_logits = self.model(images_face, images_body)
                     
                     # For MI and DC losses, if using prompt ensembling, average the learnable_text_features
                     processed_learnable_text_features = learnable_text_features
@@ -168,6 +181,12 @@ class Trainer:
                         dc_loss = self.dc_criterion(processed_learnable_text_features)
                         loss += dc_weight * dc_loss
                         dc_losses.update(dc_loss.item(), target.size(0))
+
+                    if is_train and moco_logits is not None:
+                         moco_target = torch.zeros(moco_logits.size(0), dtype=torch.long).to(self.device)
+                         moco_loss = torch.nn.CrossEntropyLoss()(moco_logits, moco_target)
+                         loss += moco_loss
+                         moco_losses.update(moco_loss.item(), target.size(0))
 
                 if is_train:
                     self.optimizer.zero_grad()
