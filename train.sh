@@ -4,9 +4,9 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python main.py \
   --mode train \
-  --exper-name A100_AttnPool_LDL_MoCo4096_BS16_LR2e5 \
+  --exper-name Train \
   --gpu 0 \
-  --epochs 60 \
+  --epochs 20 \
   --batch-size 4 \
   --optimizer AdamW \
   --lr 2e-5 \
@@ -14,7 +14,7 @@ python main.py \
   --lr-prompt-learner 2e-4 \
   --lr-adapter 1e-4 \
   --weight-decay 0.0005 \
-  --milestones 10 20 30 40 50 \
+  --milestones 10 15 \
   --gamma 0.1 \
   --temporal-layers 1 \
   --num-segments 16 \
@@ -40,7 +40,6 @@ python main.py \
   --lambda_mi 0.1 \
   --mi-warmup 5 \
   --mi-ramp 10 \
-  --slerp-weight 0.0 \
   --temperature 0.07 \
   --use-ldl \
   --ldl-temperature 1.0 \
