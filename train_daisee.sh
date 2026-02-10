@@ -51,6 +51,13 @@ for src, dst in files.items():
         f.writelines(fixed_lines)
     print(f"Copied {len(fixed_lines)} lines for {dst}")
 
+# Create dummy box file in the writable annotation directory
+import json
+dummy_box_path = os.path.join(target_dir, "dummy_box.json")
+with open(dummy_box_path, "w") as f:
+    json.dump({}, f)
+print(f"Created dummy box file at: {dummy_box_path}")
+
 print("Done!")
 EOF
 
