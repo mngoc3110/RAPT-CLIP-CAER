@@ -1,18 +1,18 @@
 #!/bin/bash
 
 # =================================================================
-# DAiSEE ENGAGEMENT PIPELINE (KAGGLE FAST DEBUG VERSION)
+# DAiSEE ENGAGEMENT PIPELINE (KAGGLE BALANCED LITE VERSION)
 # =================================================================
 
 # Writable directory for annotations on Kaggle
 ANNOT_DIR="./daisee_annotations"
 mkdir -p "$ANNOT_DIR"
 
-# Tỷ lệ lấy mẫu (0.2 = 20% dữ liệu). Đặt 1.0 để lấy hết.
-# Giảm xuống để train nhanh hơn và debug lỗi sập mode.
-SUBSAMPLE_RATIO=0.2
+# Số lượng mẫu tối đa cho MỖI lớp trong tập Train.
+# Giúp cân bằng dữ liệu và train nhanh hơn.
+MAX_SAMPLES_PER_CLASS=500
 
-echo "=> Generating DAiSEE Annotations (Subsample: $SUBSAMPLE_RATIO)..."
+echo "=> Generating DAiSEE Annotations (Balanced Subsample: $MAX_SAMPLES_PER_CLASS per class)..."
 
 python3 - <<EOF
 import os
@@ -27,7 +27,7 @@ csv_mapping = {
 }
 
 # Pass bash variable to python
-ratio = $SUBSAMPLE_RATIO
+max_samples = $MAX_SAMPLES_PER_CLASS
 
 for csv_path, dst_name in csv_mapping.items():
     if not os.path.exists(csv_path):
@@ -37,13 +37,24 @@ for csv_path, dst_name in csv_mapping.items():
     df = pd.read_csv(csv_path)
     df.columns = df.columns.str.strip()
     
-    # Subsample data
-    if ratio < 1.0:
-        original_len = len(df)
-        # Stratified sampling to keep class distribution (if possible) or random
-        # Random sampling is faster and usually fine for 'lite' version
-        df = df.sample(frac=ratio, random_state=42)
-        print(f"  -> Subsampled {dst_name}: {original_len} -> {len(df)}")
+    # Balanced Subsampling only for Training set
+    if "Train" in csv_path:
+        print(f"Balancing {dst_name} with max {max_samples} samples per class...")
+        
+        # Group by Engagement label
+        dfs = []
+        for label in df['Engagement'].unique():
+            df_class = df[df['Engagement'] == label]
+            
+            # Sample if count > max_samples
+            if len(df_class) > max_samples:
+                df_class = df_class.sample(n=max_samples, random_state=42)
+            
+            dfs.append(df_class)
+            print(f"  - Class {label}: {len(df_class)} samples")
+            
+        df = pd.concat(dfs).sample(frac=1, random_state=42) # Shuffle
+        print(f"  -> Total Balanced Train Samples: {len(df)}")
     
     lines = []
     for _, row in df.iterrows():
@@ -74,21 +85,21 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # Dataloader sẽ tìm kiếm file bên trong thư mục này.
 python main.py \
   --mode train \
-  --exper-name Train-DAiSEE-Lite \
+  --exper-name Train-DAiSEE-BalancedLite \
   --dataset DAiSEE \
   --gpu 0 \
-  --epochs 10 \
-  --batch-size 8 \
+  --epochs 15 \
+  --batch-size 4 \
   --optimizer AdamW \
   --lr 2e-5 \
   --lr-image-encoder 1e-5 \
   --lr-prompt-learner 2e-4 \
   --lr-adapter 1e-4 \
   --weight-decay 0.01 \
-  --milestones 5 8 \
+  --milestones 10 12 \
   --gamma 0.1 \
   --temporal-layers 1 \
-  --num-segments 16 \
+  --num-segments 8 \
   --duration 1 \
   --image-size 224 \
   --seed 42 \
