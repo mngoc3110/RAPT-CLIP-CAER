@@ -96,7 +96,7 @@ python main.py \
   --lr-prompt-learner 2e-4 \
   --lr-adapter 1e-4 \
   --weight-decay 0.01 \
-  --milestones 10 12 \
+  --milestones 8 12 \
   --gamma 0.1 \
   --temporal-layers 1 \
   --num-segments 8 \
@@ -116,10 +116,6 @@ python main.py \
   --lambda_mi 0.1 \
   --temperature 0.07 \
   --use-ldl \
-  --use-moco \
-  --moco-k 2048 \
-  --moco-m 0.999 \
-  --moco-t 0.07 \
   --use-amp \
   --grad-clip 1.0 \
   --mixup-alpha 0.2 \
