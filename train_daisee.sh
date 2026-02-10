@@ -43,13 +43,21 @@ for src, dst in files.items():
     with open(src_path, 'r') as f:
         lines = f.readlines()
         
-    # On Kaggle, we keep the paths as they are since root-dir will be /kaggle/input/datasets/mngochocsupham/daisee/
-    # And lines already start with DAiSEE_data/
-    fixed_lines = lines 
+    # On Kaggle, we need to adjust paths based on the actual directory structure.
+    # The error log shows paths like: .../daisee/Train/...
+    # But original txt has: DAiSEE_data/DataSet/Train/...
+    # So we need to remove "DAiSEE_data/DataSet/" prefix.
+    
+    fixed_lines = []
+    for line in lines:
+        # Remove the prefix to make path relative to root-dir
+        # Assuming root-dir points to the folder containing Train/Test/Validation
+        fixed_line = line.replace("DAiSEE_data/DataSet/", "")
+        fixed_lines.append(fixed_line)
         
     with open(dst_path, 'w') as f:
         f.writelines(fixed_lines)
-    print(f"Copied {len(fixed_lines)} lines for {dst}")
+    print(f"Copied and fixed {len(fixed_lines)} lines for {dst}")
 
 # Create dummy box file in the writable annotation directory
 import json
