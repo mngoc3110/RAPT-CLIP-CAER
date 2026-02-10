@@ -25,3 +25,7 @@ CAER-S/
 *.zip
 upload_caer_pkg/
 *.log
+CAER-S.zip
+caer_video_dataset.zip
+caer_image_dataset.zip
+caer_image_dataset/
