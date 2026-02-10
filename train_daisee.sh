@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =================================================================
-# DAiSEE ENGAGEMENT PIPELINE (KAGGLE BALANCED LITE VERSION)
+# DAiSEE ENGAGEMENT PIPELINE (KAGGLE BALANCED LITE - STABLE)
 # =================================================================
 
 # Writable directory for annotations on Kaggle
@@ -9,7 +9,6 @@ ANNOT_DIR="./daisee_annotations"
 mkdir -p "$ANNOT_DIR"
 
 # Số lượng mẫu tối đa cho MỖI lớp trong tập Train.
-# Giúp cân bằng dữ liệu và train nhanh hơn.
 MAX_SAMPLES_PER_CLASS=500
 
 echo "=> Generating DAiSEE Annotations (Balanced Subsample: $MAX_SAMPLES_PER_CLASS per class)..."
@@ -41,15 +40,11 @@ for csv_path, dst_name in csv_mapping.items():
     if "Train" in csv_path:
         print(f"Balancing {dst_name} with max {max_samples} samples per class...")
         
-        # Group by Engagement label
         dfs = []
-        for label in df['Engagement'].unique():
+        for label in sorted(df['Engagement'].unique()):
             df_class = df[df['Engagement'] == label]
-            
-            # Sample if count > max_samples
             if len(df_class) > max_samples:
                 df_class = df_class.sample(n=max_samples, random_state=42)
-            
             dfs.append(df_class)
             print(f"  - Class {label}: {len(df_class)} samples")
             
@@ -59,13 +54,7 @@ for csv_path, dst_name in csv_mapping.items():
     lines = []
     for _, row in df.iterrows():
         clip_full = str(row['ClipID']).strip()
-        # Lưu ClipID nguyên bản (có thể là 1100011002.avi)
-        # Dataloader sẽ dùng ID này để tự tìm file trên đĩa
-        
-        # Nhãn Engagement (0-3) -> (1-4)
         label = int(row['Engagement']) + 1
-        
-        # Format: ID_hoặc_Path Số_frame Nhãn
         lines.append(f"{clip_full} 300 {label}\n")
         
     with open(os.path.join("$ANNOT_DIR", dst_name), 'w') as f:
@@ -77,26 +66,25 @@ with open(os.path.join("$ANNOT_DIR", "dummy_box.json"), "w") as f:
     json.dump({}, f)
 EOF
 
-echo "=> Starting Training with DAiSEE Smart Dataloader..."
+echo "=> Starting Training with Stable Hyperparameters..."
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# --root-dir: Trỏ vào thư mục gốc của dataset trên Kaggle
-# Dataloader sẽ tìm kiếm file bên trong thư mục này.
+# Cấu hình ổn định: LR thấp hơn, tắt LDL, tăng WD.
 python main.py \
   --mode train \
-  --exper-name Train-DAiSEE-BalancedLite \
+  --exper-name Train-DAiSEE-Stable \
   --dataset DAiSEE \
   --gpu 0 \
-  --epochs 15 \
+  --epochs 20 \
   --batch-size 4 \
   --optimizer AdamW \
   --lr 2e-5 \
   --lr-image-encoder 1e-5 \
-  --lr-prompt-learner 2e-4 \
-  --lr-adapter 1e-4 \
+  --lr-prompt-learner 2e-5 \
+  --lr-adapter 2e-5 \
   --weight-decay 0.01 \
-  --milestones 8 12 \
+  --milestones 10 15 \
   --gamma 0.1 \
   --temporal-layers 1 \
   --num-segments 8 \
@@ -115,7 +103,6 @@ python main.py \
   --lambda_dc 0.1 \
   --lambda_mi 0.1 \
   --temperature 0.07 \
-  --use-ldl \
   --use-amp \
   --grad-clip 1.0 \
   --mixup-alpha 0.2 \
