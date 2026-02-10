@@ -284,7 +284,7 @@ def run_training(args: argparse.Namespace) -> None:
 
     # Final evaluation with best model
     print("=> Final evaluation on test set...")
-    pre_trained_dict = torch.load(best_checkpoint_path,map_location=f"cuda:{args.gpu}")['state_dict']
+    pre_trained_dict = torch.load(best_checkpoint_path, map_location=f"cuda:{args.gpu}", weights_only=False)['state_dict']
     model.load_state_dict(pre_trained_dict)
     computer_uar_war(
         val_loader=test_loader,
@@ -306,7 +306,7 @@ def run_eval(args: argparse.Namespace) -> None:
     model = model.to(args.device)
 
     # Load pretrained weights
-    model.load_state_dict(torch.load(args.eval_checkpoint,map_location=args.device)['state_dict'])
+    model.load_state_dict(torch.load(args.eval_checkpoint, map_location=args.device, weights_only=False)['state_dict'])
 
     # Load data
     _, _, test_loader = build_dataloaders(args)

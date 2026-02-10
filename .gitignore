@@ -3,4 +3,12 @@ raer/
 
 # Ignore training outputs / checkpoints / logs
 outputs/
-ckplus/
+ckplus/debug_predictions/
+debug_samples/
+__pycache__/
+outputs/
+CKPlus_Dataset/
+DAiSEE/
+Student_FER_Dataset/
+debug_samples/
+debug_predictions/

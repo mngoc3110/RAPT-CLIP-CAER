@@ -112,8 +112,21 @@ class VideoDataset(data.Dataset):
                 return occluded_image
     
     def _read_sample(self):
-        tmp = [x.strip().split(' ') for x in open(self.list_file)]
-        self.sample_list = [item for item in tmp]
+        # tmp = [x.strip().split(' ') for x in open(self.list_file)]
+        # self.sample_list = [item for item in tmp]
+        
+        self.sample_list = []
+        with open(self.list_file, 'r') as f:
+            for line in f:
+                parts = line.strip().split(' ')
+                if len(parts) > 3:
+                    # Path contains spaces, join all parts except the last two
+                    path = ' '.join(parts[:-2])
+                    num_frames = parts[-2]
+                    label = parts[-1]
+                    self.sample_list.append([path, num_frames, label])
+                else:
+                    self.sample_list.append(parts)
 
 
     def _parse_list(self):
@@ -236,6 +249,13 @@ def train_data_loader(root_dir, list_file, num_segments, duration, image_size,da
     if dataset_name == "RAER":
          train_transforms = torchvision.transforms.Compose([
             RandomRotation(4),
+            GroupResize(image_size),
+            GroupRandomHorizontalFlip(),
+            Stack(),
+            ToTorchFormatTensor()])
+    else:
+         # Default transforms for other datasets like CK+
+         train_transforms = torchvision.transforms.Compose([
             GroupResize(image_size),
             GroupRandomHorizontalFlip(),
             Stack(),

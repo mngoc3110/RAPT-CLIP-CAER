@@ -32,7 +32,16 @@ class GenerateModel(nn.Module):
         self.face_adapter = Adapter(c_in=512, reduction=4)
 
         # For MI Loss
-        hand_crafted_prompts = class_descriptor_5_only_face
+        if args.dataset == "RAER":
+            hand_crafted_prompts = class_descriptor_5_only_face
+        elif args.dataset == "CK+":
+            from models.Text import class_descriptor_ckplus
+            hand_crafted_prompts = class_descriptor_ckplus
+        else:
+            # Fallback to some generic or 7-class descriptors if available
+            from models.Text import class_descriptor_7_only_face
+            hand_crafted_prompts = class_descriptor_7_only_face
+            
         self.tokenized_hand_crafted_prompts = torch.cat([clip.tokenize(p) for p in hand_crafted_prompts])
         with torch.no_grad():
             embedding = clip_model.token_embedding(self.tokenized_hand_crafted_prompts).type(self.dtype)

@@ -63,7 +63,17 @@ class LSR2(nn.Module):
     def _smooth_label(self, target, length, smooth_factor):
         one_hot = self._one_hot(target, length, value=1 - smooth_factor)
         mask = (one_hot==0)
-        balance_weight = torch.tensor([0.065267810,0.817977729,1.035884371,0.388144355,0.19551041668]).to(one_hot.device)
+        
+        # Original hardcoded weights for RAER (5 classes)
+        # balance_weight = torch.tensor([0.065267810,0.817977729,1.035884371,0.388144355,0.19551041668]).to(one_hot.device)
+        
+        # Check if we should use hardcoded weights (only if length is 5)
+        # Otherwise, use uniform weights (all 1s) which effectively implements standard label smoothing
+        if length == 5:
+             balance_weight = torch.tensor([0.065267810,0.817977729,1.035884371,0.388144355,0.19551041668]).to(one_hot.device)
+        else:
+             balance_weight = torch.ones(length).to(one_hot.device)
+
         ex_weight = balance_weight.expand(one_hot.size(0),-1)
         resize_weight = ex_weight[mask].view(one_hot.size(0),-1)
         resize_weight /= resize_weight.sum(dim=1, keepdim=True)
