@@ -5,7 +5,7 @@
 # Strategy: 
 # 1. Scan Kaggle directory to find actual paths of all videos.
 # 2. Parse DAiSEE CSV labels to get correct Engagement levels.
-# 3. Generate clean train/val/test.txt annotations.
+# 3. Generate clean train/val/test.txt annotations with progress bar.
 # =================================================================
 
 # Define Data Directories (Kaggle Input)
@@ -26,14 +26,22 @@ import os
 import glob
 import json
 import pandas as pd
+try:
+    from tqdm import tqdm
+except ImportError:
+    # Fallback if tqdm is not installed (though it is standard on Kaggle)
+    def tqdm(iterable, **kwargs):
+        return iterable
 
 root_kaggle_dir = "$KAGGLE_DATASET_ROOT"
 labels_dir = "$LABELS_DIR"
 target_dir = "$ANNOT_DIR"
 
 # 1. Quét toàn bộ dataset để tạo bản đồ ClipID -> Path thực tế
-print("Step 1/3: Scanning files on disk... (Fast indexing)")
+print("Step 1/3: Scanning disk for video files...")
 clip_path_map = {}
+# os.walk can be slow, using a counter to show some activity
+file_count = 0
 for root, dirs, files in os.walk(root_kaggle_dir):
     # Ưu tiên folder 'frames' nếu có (dành cho bản đã extract)
     if os.path.basename(root) == 'frames':
@@ -46,8 +54,11 @@ for root, dirs, files in os.walk(root_kaggle_dir):
             clip_id = os.path.splitext(file)[0]
             if clip_id not in clip_path_map:
                 clip_path_map[clip_id] = os.path.relpath(os.path.join(root, file), root_kaggle_dir)
+                file_count += 1
+                if file_count % 1000 == 0:
+                    print(f"  - Indexed {file_count} files...")
 
-print(f"Indexed {len(clip_path_map)} items.")
+print(f"Total items indexed: {len(clip_path_map)}")
 
 # 2. Parse các file CSV
 csv_files = {
@@ -68,35 +79,31 @@ for csv_name, dst_name in csv_files.items():
         continue
         
     df = pd.read_csv(csv_path)
-    
     # Strip whitespace from column names
     df.columns = df.columns.str.strip()
     
     fixed_lines = []
     found_count = 0
     
-    for _, row in df.iterrows():
-        # ClipID trong CSV thường là "1100011002.avi"
+    # Thêm Progress Bar ở đây
+    for _, row in tqdm(df.iterrows(), total=len(df), desc=f"Processing {dst_name}"):
         full_clip_name = str(row['ClipID']).strip()
         clip_id = os.path.splitext(full_clip_name)[0]
         
         # Lấy nhãn Engagement (0, 1, 2, 3)
         engagement = int(row['Engagement'])
-        label_id = engagement + 1 # Chuyển sang 1-based (1, 2, 3, 4) cho dataloader
+        label_id = engagement + 1 # Chuyển sang 1-based (1, 2, 3, 4)
         
         # Tìm đường dẫn thực tế
         actual_path = clip_path_map.get(clip_id)
         
         if actual_path:
-            # DAiSEE chuẩn thường là 300 frames. 
-            # Dataloader sẽ tự đếm lại nếu là folder, hoặc dùng số này nếu là video.
-            # Ta để mặc định 300.
             fixed_lines.append(f"{actual_path} 300 {label_id}\n")
             found_count += 1
             
     with open(os.path.join(target_dir, dst_name), 'w') as f:
         f.writelines(fixed_lines)
-    print(f"Saved {dst_name}: Matched {found_count}/{len(df)} samples.")
+    print(f"Finished {dst_name}: Matched {found_count}/{len(df)} samples.")
 
 # 3. Tạo file dummy box
 dummy_box_path = os.path.join(target_dir, "dummy_box.json")
