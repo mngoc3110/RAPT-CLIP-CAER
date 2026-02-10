@@ -1,14 +1,18 @@
 #!/bin/bash
 
 # =================================================================
-# DAiSEE ENGAGEMENT PIPELINE (KAGGLE SMART VERSION)
+# DAiSEE ENGAGEMENT PIPELINE (KAGGLE FAST DEBUG VERSION)
 # =================================================================
 
 # Writable directory for annotations on Kaggle
 ANNOT_DIR="./daisee_annotations"
 mkdir -p "$ANNOT_DIR"
 
-echo "=> Generating DAiSEE Annotations from CSV labels..."
+# Tỷ lệ lấy mẫu (0.2 = 20% dữ liệu). Đặt 1.0 để lấy hết.
+# Giảm xuống để train nhanh hơn và debug lỗi sập mode.
+SUBSAMPLE_RATIO=0.2
+
+echo "=> Generating DAiSEE Annotations (Subsample: $SUBSAMPLE_RATIO)..."
 
 python3 - <<EOF
 import os
@@ -22,6 +26,9 @@ csv_mapping = {
     "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TestLabels.csv": "test.txt"
 }
 
+# Pass bash variable to python
+ratio = $SUBSAMPLE_RATIO
+
 for csv_path, dst_name in csv_mapping.items():
     if not os.path.exists(csv_path):
         print(f"Warning: {csv_path} not found!")
@@ -29,6 +36,14 @@ for csv_path, dst_name in csv_mapping.items():
         
     df = pd.read_csv(csv_path)
     df.columns = df.columns.str.strip()
+    
+    # Subsample data
+    if ratio < 1.0:
+        original_len = len(df)
+        # Stratified sampling to keep class distribution (if possible) or random
+        # Random sampling is faster and usually fine for 'lite' version
+        df = df.sample(frac=ratio, random_state=42)
+        print(f"  -> Subsampled {dst_name}: {original_len} -> {len(df)}")
     
     lines = []
     for _, row in df.iterrows():
@@ -40,7 +55,6 @@ for csv_path, dst_name in csv_mapping.items():
         label = int(row['Engagement']) + 1
         
         # Format: ID_hoặc_Path Số_frame Nhãn
-        # Để số frame giả định là 300, dataloader sẽ tự đếm lại
         lines.append(f"{clip_full} 300 {label}\n")
         
     with open(os.path.join("$ANNOT_DIR", dst_name), 'w') as f:
@@ -60,18 +74,18 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # Dataloader sẽ tìm kiếm file bên trong thư mục này.
 python main.py \
   --mode train \
-  --exper-name Train-DAiSEE-Smart \
+  --exper-name Train-DAiSEE-Lite \
   --dataset DAiSEE \
   --gpu 0 \
   --epochs 10 \
-  --batch-size 4 \
+  --batch-size 8 \
   --optimizer AdamW \
   --lr 2e-5 \
   --lr-image-encoder 1e-5 \
   --lr-prompt-learner 2e-4 \
   --lr-adapter 1e-4 \
-  --weight-decay 0.005 \
-  --milestones 10 15 \
+  --weight-decay 0.01 \
+  --milestones 5 8 \
   --gamma 0.1 \
   --temporal-layers 1 \
   --num-segments 16 \
@@ -97,4 +111,5 @@ python main.py \
   --moco-t 0.07 \
   --use-amp \
   --grad-clip 1.0 \
-  --mixup-alpha 0.2
+  --mixup-alpha 0.2 \
+  --use-weighted-sampler
