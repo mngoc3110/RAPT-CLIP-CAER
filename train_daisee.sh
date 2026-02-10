@@ -15,6 +15,9 @@ import os
 import pandas as pd
 import json
 
+# Root dir where data is located
+KAGGLE_ROOT = "/kaggle/input/datasets/mngochocsupham/daisee/"
+
 # Đường dẫn trực tiếp từ bạn cung cấp
 csv_mapping = {
     "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TrainLabels.csv": "train.txt",
@@ -34,25 +37,44 @@ for csv_path, dst_name in csv_mapping.items():
     split = "Train" if "Train" in csv_path else ("Validation" if "Validation" in csv_path else "Test")
     
     lines = []
+    missing_count = 0
+    
     for _, row in df.iterrows():
-        clip_full = str(row['ClipID']).strip()
-        clip_id = os.path.splitext(clip_full)[0]
+        clip_full = str(row['ClipID']).strip() # e.g., 1100011002.avi
+        clip_id = os.path.splitext(clip_full)[0] # e.g., 1100011002
         
         # Quy tắc DAiSEE: SubjectID là 6 chữ số đầu của ClipID
         subject_id = clip_id[:6]
         
-        # Đường dẫn dự kiến: Split/SubjectID/ClipID/frames
-        # Đây là đường dẫn tương đối so với root-dir bên dưới
-        rel_path = f"{split}/{subject_id}/{clip_id}/frames"
+        # Construct potential paths relative to KAGGLE_ROOT
+        # Option 1: Folder with frames
+        path_frames = f"{split}/{subject_id}/{clip_id}/frames"
+        # Option 2: Video file (avi)
+        path_avi = f"{split}/{subject_id}/{clip_full}"
+        # Option 3: Video file (mp4)
+        path_mp4 = f"{split}/{subject_id}/{clip_id}.mp4"
         
-        # Nhãn Engagement (0-3) -> (1-4)
-        label = int(row['Engagement']) + 1
-        
-        lines.append(f"{rel_path} 300 {label}\n")
+        # Check existence
+        final_rel_path = None
+        if os.path.exists(os.path.join(KAGGLE_ROOT, path_frames)):
+            final_rel_path = path_frames
+        elif os.path.exists(os.path.join(KAGGLE_ROOT, path_avi)):
+            final_rel_path = path_avi
+        elif os.path.exists(os.path.join(KAGGLE_ROOT, path_mp4)):
+            final_rel_path = path_mp4
+            
+        if final_rel_path:
+            # Nhãn Engagement (0-3) -> (1-4)
+            label = int(row['Engagement']) + 1
+            # Default 300 frames, dataloader handles actual count
+            lines.append(f"{final_rel_path} 300 {label}\n")
+        else:
+            # print(f"Missing: {clip_id} in {split}")
+            missing_count += 1
         
     with open(os.path.join("$ANNOT_DIR", dst_name), 'w') as f:
         f.writelines(lines)
-    print(f"Created {dst_name} with {len(lines)} samples.")
+    print(f"Created {dst_name}: Found {len(lines)}, Missing {missing_count}")
 
 # Tạo dummy box
 with open(os.path.join("$ANNOT_DIR", "dummy_box.json"), "w") as f:
@@ -70,7 +92,7 @@ python main.py \
   --dataset DAiSEE \
   --gpu 0 \
   --epochs 20 \
-  --batch-size 8 \
+  --batch-size 4 \
   --optimizer AdamW \
   --lr 2e-5 \
   --lr-image-encoder 1e-5 \
