@@ -63,7 +63,7 @@ python main.py \
   --exper-name Train-DAiSEE-Smart \
   --dataset DAiSEE \
   --gpu 0 \
-  --epochs 20 \
+  --epochs 10 \
   --batch-size 4 \
   --optimizer AdamW \
   --lr 2e-5 \
