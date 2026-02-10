@@ -1,15 +1,13 @@
 #!/bin/bash
 
 # =================================================================
-# DAiSEE ENGAGEMENT PIPELINE (KAGGLE VERSION)
-# Strategy: 
-# 1. Use existing daisee_*.txt files from Kaggle input.
-# 2. Smartly map IDs to actual video files or frame folders.
-# 3. Start training for 4 engagement levels.
+# DAiSEE ENGAGEMENT PIPELINE (KAGGLE STABLE VERSION)
 # =================================================================
 
 # Define Data Directories (Kaggle Input)
-ROOT_DATA_DIR="/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data"
+# Dựa trên đường dẫn bạn cung cấp: /kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TestLabels.csv
+KAGGLE_DATASET_ROOT="/kaggle/input/datasets/mngochocsupham/daisee"
+ROOT_DATA_DIR="$KAGGLE_DATASET_ROOT/DAiSEE_data"
 # Writable directory for annotations on Kaggle
 ANNOT_DIR="./daisee_annotations"
 
@@ -22,11 +20,11 @@ echo "=> Preparing DAiSEE Annotations for Kaggle..."
 python3 - <<EOF
 import os
 import glob
+import json
 
-# Use the ROOT_DATA_DIR defined in bash
 source_dir = "$ROOT_DATA_DIR"
 target_dir = "$ANNOT_DIR"
-root_kaggle_dir = "/kaggle/input/datasets/mngochocsupham/daisee/"
+root_kaggle_dir = "$KAGGLE_DATASET_ROOT"
 
 files = {
     "daisee_train.txt": "train.txt",
@@ -34,87 +32,75 @@ files = {
     "daisee_test.txt": "test.txt"
 }
 
-# Helper to find the actual path of a clip
-def find_clip_path(clip_id, split_folder):
-    # Search for video file with clip_id
-    # Pattern 1: .../Train/ClipID.avi
-    # Pattern 2: .../Train/SubjectID/ClipID.avi
-    # We search recursively in the split folder (Train/Test/Validation)
+def find_clip_path(clip_id, split_name):
+    # Tìm kiếm file video hoặc folder frames chứa Clip ID
+    # split_name: Train, Test, Validation
     
-    search_path = os.path.join(root_kaggle_dir, split_folder)
+    # Thử tìm trực tiếp trong thư mục DataSet của split đó
+    search_pattern = os.path.join(root_kaggle_dir, "**", f"{clip_id}*")
+    candidates = glob.glob(search_pattern, recursive=True)
     
-    # Try finding video file
-    video_files = glob.glob(os.path.join(search_path, "**", f"{clip_id}.*"), recursive=True)
-    video_files = [f for f in video_files if f.endswith(('.avi', '.mp4', '.mov'))]
-    
-    if video_files:
-        # Return path relative to root_kaggle_dir for dataloader
-        rel_path = os.path.relpath(video_files[0], root_kaggle_dir)
-        return rel_path
-        
-    # Try finding frame folder
-    frame_folders = glob.glob(os.path.join(search_path, "**", clip_id, "frames"), recursive=True)
-    if frame_folders:
-        rel_path = os.path.relpath(frame_folders[0], root_kaggle_dir)
-        return rel_path
-        
+    # Ưu tiên folder 'frames' nếu có
+    for c in candidates:
+        if os.path.isdir(c) and c.endswith("frames"):
+            return os.path.relpath(c, root_kaggle_dir)
+            
+    # Ưu tiên file video (.avi, .mp4)
+    for c in candidates:
+        if os.path.isfile(c) and c.lower().endswith((".avi", ".mp4", ".mov")):
+            return os.path.relpath(c, root_kaggle_dir)
+            
+    # Thử folder cha của frames
+    for c in candidates:
+        if os.path.isdir(c) and os.path.exists(os.path.join(c, "frames")):
+            return os.path.relpath(os.path.join(c, "frames"), root_kaggle_dir)
+            
     return None
 
 for src, dst in files.items():
+    # Tìm file txt nguồn (có thể nằm ở ROOT_DATA_DIR hoặc KAGGLE_DATASET_ROOT)
     src_path = os.path.join(source_dir, src)
+    if not os.path.exists(src_path):
+        src_path = os.path.join(root_kaggle_dir, src)
+        
+    if not os.path.exists(src_path):
+        print(f"Warning: Source {src} not found in {source_dir} or {root_kaggle_dir}")
+        continue
+        
     dst_path = os.path.join(target_dir, dst)
     
-    if not os.path.exists(src_path):
-        print(f"Warning: Source {src_path} not found.")
-        continue
-    
-    # Determine split folder name from filename
-    if "train" in src: split_folder = "Train"
-    elif "val" in src: split_folder = "Validation"
-    elif "test" in src: split_folder = "Test"
-    else: split_folder = ""
-        
     with open(src_path, 'r') as f:
         lines = f.readlines()
         
     fixed_lines = []
-    found_count = 0
-    missing_count = 0
+    found = 0
+    missing = 0
+    
+    split_name = "Train" if "train" in src else ("Test" if "test" in src else "Validation")
     
     for line in lines:
         parts = line.strip().split(' ')
         if len(parts) < 3: continue
         
-        orig_path = parts[0] # e.g., DAiSEE_data/DataSet/Train/110001/1100011002/frames
-        
-        # Extract Clip ID. Usually the second to last part if frames is last.
-        # 1100011002/frames -> 1100011002
-        # Or just filename without extension if it's a video path
-        
+        # Lấy Clip ID từ đường dẫn cũ
+        # Ví dụ: DAiSEE_data/DataSet/Train/110001/1100011002/frames -> 1100011002
+        orig_path = parts[0]
         path_parts = orig_path.split('/')
-        if path_parts[-1] == 'frames':
-            clip_id = path_parts[-2]
+        clip_id = path_parts[-2] if path_parts[-1] == 'frames' else os.path.splitext(path_parts[-1])[0]
+        
+        actual_rel_path = find_clip_path(clip_id, split_name)
+        
+        if actual_rel_path:
+            fixed_lines.append(f"{actual_rel_path} {parts[1]} {parts[2]}\n")
+            found += 1
         else:
-            clip_id = os.path.splitext(path_parts[-1])[0]
+            missing += 1
             
-        actual_path = find_clip_path(clip_id, split_folder)
-        
-        if actual_path:
-            # Reconstruct line with new path
-            # Keep num_frames and label from original line
-            new_line = f"{actual_path} {parts[1]} {parts[2]}\n"
-            fixed_lines.append(new_line)
-            found_count += 1
-        else:
-            # print(f"Missing: {clip_id}")
-            missing_count += 1
-        
     with open(dst_path, 'w') as f:
         f.writelines(fixed_lines)
-    print(f"Processed {dst}: Found {found_count}, Missing {missing_count}")
+    print(f"Processed {dst}: Found {found}, Missing {missing}")
 
-# Create dummy box file in the writable annotation directory
-import json
+# Create dummy box file
 dummy_box_path = os.path.join(target_dir, "dummy_box.json")
 with open(dummy_box_path, "w") as f:
     json.dump({}, f)
@@ -130,9 +116,6 @@ fi
 
 # --- Step 2: Training ---
 echo "=> Starting Training on Kaggle..."
-
-# DAiSEE videos are typically 10 seconds, sampled at 30fps = 300 frames.
-# We'll sample 16 segments from each video.
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
@@ -157,7 +140,7 @@ python main.py \
   --image-size 224 \
   --seed 42 \
   --print-freq 10 \
-  --root-dir /kaggle/input/datasets/mngochocsupham/daisee/ \
+  --root-dir "$KAGGLE_DATASET_ROOT/" \
   --train-annotation "$ANNOT_DIR/train.txt" \
   --val-annotation "$ANNOT_DIR/val.txt" \
   --test-annotation "$ANNOT_DIR/test.txt" \
