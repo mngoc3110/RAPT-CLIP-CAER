@@ -9,6 +9,7 @@ from clip import clip
 
 from dataloader.video_dataloader import train_data_loader, test_data_loader
 from dataloader.ckplus_dataloader import ckplus_train_data_loader, ckplus_test_data_loader
+from dataloader.daisee_dataloader import daisee_train_data_loader, daisee_test_data_loader
 from models.Generate_Model import GenerateModel
 from models.Text import *
 from utils.utils import *
@@ -123,6 +124,26 @@ def build_dataloaders(args: argparse.Namespace) -> Tuple[torch.utils.data.DataLo
         test_data = ckplus_test_data_loader(
             root_dir=args.root_dir, list_file=test_annotation_file_path, num_segments=args.num_segments,
             duration=args.duration, image_size=args.image_size
+        )
+    elif args.dataset.strip() == "DAiSEE":
+        print(f"=> Using DAiSEE smart dataloader...")
+        train_data = daisee_train_data_loader(
+            root_dir=args.root_dir, list_file=train_annotation_file_path, num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size,
+            bounding_box_face=args.bounding_box_face, bounding_box_body=args.bounding_box_body,
+            crop_body=args.crop_body, num_classes=num_classes
+        )
+        val_data = daisee_test_data_loader(
+            root_dir=args.root_dir, list_file=val_annotation_file_path, num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size,
+            bounding_box_face=args.bounding_box_face, bounding_box_body=args.bounding_box_body,
+            crop_body=args.crop_body, num_classes=num_classes
+        )
+        test_data = daisee_test_data_loader(
+            root_dir=args.root_dir, list_file=test_annotation_file_path, num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size,
+            bounding_box_face=args.bounding_box_face, bounding_box_body=args.bounding_box_body,
+            crop_body=args.crop_body, num_classes=num_classes
         )
     else:
         print(f"Loading train data (Standard) for {args.dataset}...")

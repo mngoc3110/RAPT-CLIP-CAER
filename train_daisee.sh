@@ -1,24 +1,21 @@
 #!/bin/bash
 
 # =================================================================
-# DAiSEE ENGAGEMENT PIPELINE (KAGGLE DIRECT VERSION)
+# DAiSEE ENGAGEMENT PIPELINE (KAGGLE SMART VERSION)
 # =================================================================
 
 # Writable directory for annotations on Kaggle
 ANNOT_DIR="./daisee_annotations"
 mkdir -p "$ANNOT_DIR"
 
-echo "=> Generating DAiSEE Annotations directly from CSV labels..."
+echo "=> Generating DAiSEE Annotations from CSV labels..."
 
 python3 - <<EOF
 import os
 import pandas as pd
 import json
 
-# Root dir where data is located
-KAGGLE_ROOT = "/kaggle/input/datasets/mngochocsupham/daisee/"
-
-# Đường dẫn trực tiếp từ bạn cung cấp
+# Các đường dẫn CSV nhãn trên Kaggle của bạn
 csv_mapping = {
     "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TrainLabels.csv": "train.txt",
     "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/ValidationLabels.csv": "val.txt",
@@ -27,68 +24,43 @@ csv_mapping = {
 
 for csv_path, dst_name in csv_mapping.items():
     if not os.path.exists(csv_path):
-        print(f"Error: {csv_path} not found!")
+        print(f"Warning: {csv_path} not found!")
         continue
         
     df = pd.read_csv(csv_path)
     df.columns = df.columns.str.strip()
     
-    #Xác định folder split (Train/Validation/Test)
-    split = "Train" if "Train" in csv_path else ("Validation" if "Validation" in csv_path else "Test")
-    
     lines = []
-    missing_count = 0
-    
     for _, row in df.iterrows():
-        clip_full = str(row['ClipID']).strip() # e.g., 1100011002.avi
-        clip_id = os.path.splitext(clip_full)[0] # e.g., 1100011002
+        clip_full = str(row['ClipID']).strip()
+        # Lưu ClipID nguyên bản (có thể là 1100011002.avi)
+        # Dataloader sẽ dùng ID này để tự tìm file trên đĩa
         
-        # Quy tắc DAiSEE: SubjectID là 6 chữ số đầu của ClipID
-        subject_id = clip_id[:6]
+        # Nhãn Engagement (0-3) -> (1-4)
+        label = int(row['Engagement']) + 1
         
-        # Construct potential paths relative to KAGGLE_ROOT
-        # Option 1: Folder with frames
-        path_frames = f"{split}/{subject_id}/{clip_id}/frames"
-        # Option 2: Video file (avi)
-        path_avi = f"{split}/{subject_id}/{clip_full}"
-        # Option 3: Video file (mp4)
-        path_mp4 = f"{split}/{subject_id}/{clip_id}.mp4"
-        
-        # Check existence
-        final_rel_path = None
-        if os.path.exists(os.path.join(KAGGLE_ROOT, path_frames)):
-            final_rel_path = path_frames
-        elif os.path.exists(os.path.join(KAGGLE_ROOT, path_avi)):
-            final_rel_path = path_avi
-        elif os.path.exists(os.path.join(KAGGLE_ROOT, path_mp4)):
-            final_rel_path = path_mp4
-            
-        if final_rel_path:
-            # Nhãn Engagement (0-3) -> (1-4)
-            label = int(row['Engagement']) + 1
-            # Default 300 frames, dataloader handles actual count
-            lines.append(f"{final_rel_path} 300 {label}\n")
-        else:
-            # print(f"Missing: {clip_id} in {split}")
-            missing_count += 1
+        # Format: ID_hoặc_Path Số_frame Nhãn
+        # Để số frame giả định là 300, dataloader sẽ tự đếm lại
+        lines.append(f"{clip_full} 300 {label}\n")
         
     with open(os.path.join("$ANNOT_DIR", dst_name), 'w') as f:
         f.writelines(lines)
-    print(f"Created {dst_name}: Found {len(lines)}, Missing {missing_count}")
+    print(f"Prepared {dst_name} with {len(lines)} samples.")
 
 # Tạo dummy box
 with open(os.path.join("$ANNOT_DIR", "dummy_box.json"), "w") as f:
     json.dump({}, f)
 EOF
 
-echo "=> Starting Training..."
+echo "=> Starting Training with DAiSEE Smart Dataloader..."
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# Lưu ý: --root-dir trỏ vào folder chứa các thư mục Train, Test, Validation
+# --root-dir: Trỏ vào thư mục gốc của dataset trên Kaggle
+# Dataloader sẽ tìm kiếm file bên trong thư mục này.
 python main.py \
   --mode train \
-  --exper-name Train-DAiSEE-Direct \
+  --exper-name Train-DAiSEE-Smart \
   --dataset DAiSEE \
   --gpu 0 \
   --epochs 20 \

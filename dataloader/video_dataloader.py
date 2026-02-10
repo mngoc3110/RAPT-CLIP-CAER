@@ -169,27 +169,63 @@ class VideoDataset(data.Dataset):
         return self.get(record, segment_indices)
 
     def get(self, record, indices):
-        video_frames_path = glob.glob(os.path.join(record.path, '*'))
-        video_frames_path.sort()
-        
-        num_real_frames = len(video_frames_path)
+        # Check if record.path is a directory (frames) or a file (video)
+        if os.path.isdir(record.path):
+            video_frames_path = glob.glob(os.path.join(record.path, '*'))
+            video_frames_path.sort()
+            num_real_frames = len(video_frames_path)
+            is_video_file = False
+        else:
+            # Assume it's a video file
+            is_video_file = True
+            cap = cv2.VideoCapture(record.path)
+            num_real_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            # Don't release cap yet, we need it to read frames
+            if not cap.isOpened():
+                 print(f"Warning: Could not open video file {record.path}, returning zeros.")
+                 num_real_frames = 0
+
         if num_real_frames == 0:
             print(f"Warning: No frames found for video {record.path}, returning zeros.")
             dummy_shape = (self.num_segments * self.duration, 3, self.image_size, self.image_size)
+            if is_video_file and 'cap' in locals(): cap.release()
             return torch.zeros(dummy_shape), torch.zeros(dummy_shape), record.label - 1
 
         # Clamp indices to be valid
         indices = np.clip(indices, 0, num_real_frames - 1)
         
-        random_num = random.random()
         images = list()
         images_face = list()
+        
         for seg_ind in indices:
             p = int(seg_ind)
             for i in range(self.duration):
-                img_path = video_frames_path[p]
-                parent_dir = os.path.dirname(img_path)
-                file_name = os.path.basename(img_path)
+                if is_video_file:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, p)
+                    ret, frame = cap.read()
+                    if ret:
+                        # cv2 reads in BGR, convert to RGB for PIL
+                        img_cv = frame # Keep BGR for _face_detect or convert? 
+                        # _face_detect uses PIL. Let's convert to PIL.
+                        img_cv_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+                        img_pil = Image.fromarray(img_cv_rgb)
+                        
+                        # Mock path for box lookup (parent dir and filename)
+                        # For video file, parent is dir, filename is video name + frame index?
+                        # This bbox logic might need adjustment for video files if you have frame-level boxes.
+                        # For now, let's assume we use the video path or parent dir for box lookup key.
+                        parent_dir = os.path.dirname(record.path)
+                        file_name = os.path.basename(record.path) # Use video filename
+                    else:
+                        # Failed to read frame, use black image
+                        img_pil = Image.new('RGB', (self.image_size, self.image_size))
+                        parent_dir = ""
+                        file_name = ""
+                else:
+                    img_path = video_frames_path[p]
+                    parent_dir = os.path.dirname(img_path)
+                    file_name = os.path.basename(img_path)
+                    img_pil = Image.open(img_path)
 
                 if parent_dir in self.boxs:
                     if file_name in self.boxs[parent_dir]:
@@ -199,15 +235,17 @@ class VideoDataset(data.Dataset):
                 else:
                     box = None
 
-                img_pil = Image.open(img_path)
-                img_pil_face = self._face_detect(Image.open(img_path), box, margin=20, mode='face')
+                # Perform face detection / cropping
+                img_pil_face = self._face_detect(img_pil, box, margin=20, mode='face')
 
                 # Debugging: Save sample images
                 current_label = record.label - 1
                 if self.mode == 'train' and self._saved_samples.get(current_label, 0) < 5:
                     sample_path = os.path.join(self.debug_samples_path, f'class_{current_label}')
                     os.makedirs(sample_path, exist_ok=True)
-                    img_name = f'sample_{self._saved_samples[current_label]}_{os.path.basename(record.path)}_{file_name}'
+                    # Unique name
+                    base_name = os.path.basename(record.path)
+                    img_name = f'sample_{self._saved_samples[current_label]}_{base_name}_{p}.jpg'
                     img_pil_face.save(os.path.join(sample_path, img_name))
                     self._saved_samples[current_label] += 1
 
@@ -233,6 +271,9 @@ class VideoDataset(data.Dataset):
                 images_face.extend(seg_imgs_face)
                 if p < num_real_frames - 1:
                     p += 1
+        
+        if is_video_file:
+            cap.release()
 
         images = self.transform(images)
         images = torch.reshape(images, (-1, 3, self.image_size, self.image_size))
