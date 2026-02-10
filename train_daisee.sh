@@ -32,33 +32,36 @@ files = {
     "daisee_test.txt": "test.txt"
 }
 
-def find_clip_path(clip_id, split_name):
-    # Tìm kiếm file video hoặc folder frames chứa Clip ID
-    # split_name: Train, Test, Validation
-    
-    # Thử tìm trực tiếp trong thư mục DataSet của split đó
-    search_pattern = os.path.join(root_kaggle_dir, "**", f"{clip_id}*")
-    candidates = glob.glob(search_pattern, recursive=True)
-    
-    # Ưu tiên folder 'frames' nếu có
-    for c in candidates:
-        if os.path.isdir(c) and c.endswith("frames"):
-            return os.path.relpath(c, root_kaggle_dir)
-            
-    # Ưu tiên file video (.avi, .mp4)
-    for c in candidates:
-        if os.path.isfile(c) and c.lower().endswith((".avi", ".mp4", ".mov")):
-            return os.path.relpath(c, root_kaggle_dir)
-            
-    # Thử folder cha của frames
-    for c in candidates:
-        if os.path.isdir(c) and os.path.exists(os.path.join(c, "frames")):
-            return os.path.relpath(os.path.join(c, "frames"), root_kaggle_dir)
-            
-    return None
+# --- OPTIMIZATION: Build a Lookup Dictionary ---
+print("Scanning dataset to build file index... This may take a moment.")
+clip_path_map = {}
+
+# Walk through the entire root directory once
+for root, dirs, files_in_dir in os.walk(root_kaggle_dir):
+    # Check for 'frames' folder
+    if os.path.basename(root) == 'frames':
+        # Parent folder name is usually the Clip ID
+        clip_id = os.path.basename(os.path.dirname(root))
+        rel_path = os.path.relpath(root, root_kaggle_dir)
+        clip_path_map[clip_id] = rel_path
+        continue
+
+    # Check for video files
+    for file in files_in_dir:
+        if file.lower().endswith(('.avi', '.mp4', '.mov')):
+            clip_id = os.path.splitext(file)[0]
+            # If we already found a 'frames' folder for this ID, keep it (preferred)
+            if clip_id not in clip_path_map:
+                rel_path = os.path.relpath(os.path.join(root, file), root_kaggle_dir)
+                clip_path_map[clip_id] = rel_path
+
+print(f"Indexed {len(clip_path_map)} clips.")
+
+def find_clip_path_fast(clip_id):
+    return clip_path_map.get(clip_id)
 
 for src, dst in files.items():
-    # Tìm file txt nguồn (có thể nằm ở ROOT_DATA_DIR hoặc KAGGLE_DATASET_ROOT)
+    # Tìm file txt nguồn
     src_path = os.path.join(source_dir, src)
     if not os.path.exists(src_path):
         src_path = os.path.join(root_kaggle_dir, src)
@@ -76,19 +79,21 @@ for src, dst in files.items():
     found = 0
     missing = 0
     
-    split_name = "Train" if "train" in src else ("Test" if "test" in src else "Validation")
-    
     for line in lines:
         parts = line.strip().split(' ')
         if len(parts) < 3: continue
         
         # Lấy Clip ID từ đường dẫn cũ
-        # Ví dụ: DAiSEE_data/DataSet/Train/110001/1100011002/frames -> 1100011002
         orig_path = parts[0]
         path_parts = orig_path.split('/')
-        clip_id = path_parts[-2] if path_parts[-1] == 'frames' else os.path.splitext(path_parts[-1])[0]
+        if path_parts[-1] == 'frames':
+            clip_id = path_parts[-2]
+        else:
+            # Handle cases where path might be just a filename or have extension
+            filename = path_parts[-1]
+            clip_id = os.path.splitext(filename)[0]
         
-        actual_rel_path = find_clip_path(clip_id, split_name)
+        actual_rel_path = find_clip_path_fast(clip_id)
         
         if actual_rel_path:
             fixed_lines.append(f"{actual_rel_path} {parts[1]} {parts[2]}\n")
