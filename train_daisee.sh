@@ -4,7 +4,7 @@
 # DAiSEE ENGAGEMENT PIPELINE (KAGGLE VERSION)
 # Strategy: 
 # 1. Use existing daisee_*.txt files from Kaggle input.
-# 2. Save fixed annotations to a writable local directory.
+# 2. Smartly map IDs to actual video files or frame folders.
 # 3. Start training for 4 engagement levels.
 # =================================================================
 
@@ -21,16 +21,44 @@ echo "=> Preparing DAiSEE Annotations for Kaggle..."
 
 python3 - <<EOF
 import os
+import glob
 
 # Use the ROOT_DATA_DIR defined in bash
 source_dir = "$ROOT_DATA_DIR"
 target_dir = "$ANNOT_DIR"
+root_kaggle_dir = "/kaggle/input/datasets/mngochocsupham/daisee/"
 
 files = {
     "daisee_train.txt": "train.txt",
     "daisee_val.txt": "val.txt",
     "daisee_test.txt": "test.txt"
 }
+
+# Helper to find the actual path of a clip
+def find_clip_path(clip_id, split_folder):
+    # Search for video file with clip_id
+    # Pattern 1: .../Train/ClipID.avi
+    # Pattern 2: .../Train/SubjectID/ClipID.avi
+    # We search recursively in the split folder (Train/Test/Validation)
+    
+    search_path = os.path.join(root_kaggle_dir, split_folder)
+    
+    # Try finding video file
+    video_files = glob.glob(os.path.join(search_path, "**", f"{clip_id}.*"), recursive=True)
+    video_files = [f for f in video_files if f.endswith(('.avi', '.mp4', '.mov'))]
+    
+    if video_files:
+        # Return path relative to root_kaggle_dir for dataloader
+        rel_path = os.path.relpath(video_files[0], root_kaggle_dir)
+        return rel_path
+        
+    # Try finding frame folder
+    frame_folders = glob.glob(os.path.join(search_path, "**", clip_id, "frames"), recursive=True)
+    if frame_folders:
+        rel_path = os.path.relpath(frame_folders[0], root_kaggle_dir)
+        return rel_path
+        
+    return None
 
 for src, dst in files.items():
     src_path = os.path.join(source_dir, src)
@@ -39,25 +67,51 @@ for src, dst in files.items():
     if not os.path.exists(src_path):
         print(f"Warning: Source {src_path} not found.")
         continue
+    
+    # Determine split folder name from filename
+    if "train" in src: split_folder = "Train"
+    elif "val" in src: split_folder = "Validation"
+    elif "test" in src: split_folder = "Test"
+    else: split_folder = ""
         
     with open(src_path, 'r') as f:
         lines = f.readlines()
         
-    # On Kaggle, we need to adjust paths based on the actual directory structure.
-    # The error log shows paths like: .../daisee/Train/...
-    # But original txt has: DAiSEE_data/DataSet/Train/...
-    # So we need to remove "DAiSEE_data/DataSet/" prefix.
-    
     fixed_lines = []
+    found_count = 0
+    missing_count = 0
+    
     for line in lines:
-        # Remove the prefix to make path relative to root-dir
-        # Assuming root-dir points to the folder containing Train/Test/Validation
-        fixed_line = line.replace("DAiSEE_data/DataSet/", "")
-        fixed_lines.append(fixed_line)
+        parts = line.strip().split(' ')
+        if len(parts) < 3: continue
+        
+        orig_path = parts[0] # e.g., DAiSEE_data/DataSet/Train/110001/1100011002/frames
+        
+        # Extract Clip ID. Usually the second to last part if frames is last.
+        # 1100011002/frames -> 1100011002
+        # Or just filename without extension if it's a video path
+        
+        path_parts = orig_path.split('/')
+        if path_parts[-1] == 'frames':
+            clip_id = path_parts[-2]
+        else:
+            clip_id = os.path.splitext(path_parts[-1])[0]
+            
+        actual_path = find_clip_path(clip_id, split_folder)
+        
+        if actual_path:
+            # Reconstruct line with new path
+            # Keep num_frames and label from original line
+            new_line = f"{actual_path} {parts[1]} {parts[2]}\n"
+            fixed_lines.append(new_line)
+            found_count += 1
+        else:
+            # print(f"Missing: {clip_id}")
+            missing_count += 1
         
     with open(dst_path, 'w') as f:
         f.writelines(fixed_lines)
-    print(f"Copied and fixed {len(fixed_lines)} lines for {dst}")
+    print(f"Processed {dst}: Found {found_count}, Missing {missing_count}")
 
 # Create dummy box file in the writable annotation directory
 import json
