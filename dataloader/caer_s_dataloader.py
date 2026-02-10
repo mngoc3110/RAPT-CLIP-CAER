@@ -40,18 +40,24 @@ class CAERSDataset(data.Dataset):
         self.cascade_path = os.path.join(cv2.data.haarcascades, 'haarcascade_frontalface_default.xml')
 
     def _make_dataset(self, directory):
-        instances = []
         directory = os.path.expanduser(directory)
         
-        # Logic xử lý mode: 'train', 'val', 'test'
-        if self.mode in ['train', 'val']:
+        # Logic xử lý mode: map to specific folder
+        if self.mode == 'train':
             source_folder = 'train'
+        elif self.mode == 'val':
+            # Use dedicated validation folder if exists, otherwise try 'val'
+            source_folder = 'validation'
+            if not os.path.exists(os.path.join(directory, source_folder)) and os.path.exists(os.path.join(directory, 'val')):
+                 source_folder = 'val'
         else: # mode == 'test'
             source_folder = 'test'
             
         target_dir = os.path.join(directory, source_folder)
-        
         print(f"Scanning {target_dir} for CAER-S data (Source for {self.mode})...")
+        
+        if not os.path.exists(target_dir):
+            raise RuntimeError(f"Directory not found: {target_dir}")
 
         # Collect samples per class to maintain balance when subsampling
         samples_per_class = {}
@@ -98,25 +104,12 @@ class CAERSDataset(data.Dataset):
             for samples in samples_per_class.values():
                 all_samples.extend(samples)
         
-        # Nếu là test set, trả về toàn bộ (hoặc subsample nếu muốn test nhanh)
-        if self.mode == 'test':
-            print(f"Found {len(all_samples)} samples for Test set.")
-            return all_samples
-
-        # Nếu là train/val, thực hiện chia tách trên tập đã subsample
+        # Shuffle final list
         random.seed(self.seed)
         random.shuffle(all_samples)
         
-        split_idx = int(len(all_samples) * (1 - self.val_split))
-        
-        if self.mode == 'train':
-            final_samples = all_samples[:split_idx]
-            print(f"Split Train: {len(final_samples)} samples (Total source: {len(all_samples)})")
-        else: # mode == 'val'
-            final_samples = all_samples[split_idx:]
-            print(f"Split Val: {len(final_samples)} samples (Total source: {len(all_samples)})")
-            
-        return final_samples
+        print(f"Found {len(all_samples)} samples for {self.mode} set.")
+        return all_samples
 
     def _face_detect_cv2(self, img_pil):
         # Convert PIL to CV2 (BGR)

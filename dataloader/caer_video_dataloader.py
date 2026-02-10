@@ -43,14 +43,24 @@ class CAERVideoDataset(data.Dataset):
     def _make_dataset(self, directory):
         directory = os.path.expanduser(directory)
         
-        # Handle mode
-        if self.mode in ['train', 'val']:
+        # Handle mode: Map mode to folder name
+        if self.mode == 'train':
             source_folder = 'train'
+        elif self.mode == 'val':
+            # Use the dedicated validation folder if available
+            # Note: CAER dataset has 'validation' folder
+            source_folder = 'validation'
+            # Fallback if 'validation' doesn't exist but 'val' does (just in case)
+            if not os.path.exists(os.path.join(directory, source_folder)) and os.path.exists(os.path.join(directory, 'val')):
+                source_folder = 'val'
         else: # mode == 'test'
             source_folder = 'test'
             
         target_dir = os.path.join(directory, source_folder)
         print(f"Scanning {target_dir} for CAER video data (Source for {self.mode})...")
+        
+        if not os.path.exists(target_dir):
+             raise RuntimeError(f"Directory not found: {target_dir}")
 
         # Collect samples per class
         samples_per_class_dict = {}
@@ -72,6 +82,8 @@ class CAERVideoDataset(data.Dataset):
             print(f"Limiting dataset to {self.samples_per_class} videos per class...")
             random.seed(self.seed)
             for class_idx, samples in samples_per_class_dict.items():
+                # Only shuffle and limit if we need to subsample
+                # If we want deterministic full set (like test), we might not shuffle, but here we enforce limit
                 random.shuffle(samples)
                 selected = samples[:self.samples_per_class]
                 all_samples.extend(selected)
@@ -80,24 +92,15 @@ class CAERVideoDataset(data.Dataset):
             for samples in samples_per_class_dict.values():
                 all_samples.extend(samples)
         
-        if self.mode == 'test':
-            print(f"Found {len(all_samples)} videos for Test set.")
-            return all_samples
-
-        # Split train/val
+        # Shuffle final list for training, keep sorted/stable for val/test if desired?
+        # Actually DataLoader handles shuffle for train. 
+        # But for 'val' and 'test', usually we don't need to shuffle inside dataset unless we subsampled.
+        # Let's shuffle all to mix classes in the list (good for batch norm if not shuffling loader)
         random.seed(self.seed)
         random.shuffle(all_samples)
         
-        split_idx = int(len(all_samples) * (1 - self.val_split))
-        
-        if self.mode == 'train':
-            final_samples = all_samples[:split_idx]
-            print(f"Split Train: {len(final_samples)} videos (Total source: {len(all_samples)})")
-        else: # mode == 'val'
-            final_samples = all_samples[split_idx:]
-            print(f"Split Val: {len(final_samples)} videos (Total source: {len(all_samples)})")
-            
-        return final_samples
+        print(f"Found {len(all_samples)} videos for {self.mode} set.")
+        return all_samples
 
     def _load_video(self, path):
         cap = cv2.VideoCapture(path)

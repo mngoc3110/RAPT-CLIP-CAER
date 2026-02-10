@@ -205,7 +205,8 @@ def build_dataloaders(args: argparse.Namespace) -> Tuple[torch.utils.data.DataLo
     
     sampler = None
     shuffle = True
-    if args.use_weighted_sampler and args.dataset != "CAER-S":
+    # Disable WeightedRandomSampler for CAER/CAER-S/CAER_Combined as they don't use annotation files
+    if args.use_weighted_sampler and args.dataset not in ["CAER-S", "CAER", "CAER_Combined"]:
         print("=> Using WeightedRandomSampler.")
         class_counts = get_class_counts(train_annotation_file_path)
         class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)
