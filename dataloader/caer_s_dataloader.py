@@ -180,13 +180,13 @@ class CAERSDataset(data.Dataset):
         return len(self.samples)
 
 def caer_s_data_loader(root_dir, mode, num_segments, duration, image_size):
-    # Cấu hình số lượng mẫu cứng mỗi nhãn (Thay vì dùng %)
-    # Train: 500 ảnh/nhãn để đảm bảo model học tốt hơn (Tổng ~3500 ảnh)
-    # Val/Test: 100 ảnh/nhãn để đánh giá nhanh (Tổng ~700 ảnh)
+    # Cấu hình số lượng mẫu cứng mỗi nhãn
     if mode == 'train':
         SAMPLES_PER_CLASS = 500
-    else:
-        SAMPLES_PER_CLASS = 100
+    elif mode == 'val':
+        SAMPLES_PER_CLASS = 200
+    else: # test
+        SAMPLES_PER_CLASS = None # Lấy toàn bộ tập Test để có kết quả chính xác nhất
 
     # Chúng ta truyền tham số này vào dataset thông qua biến subsample_ratio 
     # (nhưng sửa logic bên trong class Dataset để hiểu đây là số lượng thay vì tỷ lệ)

@@ -193,8 +193,10 @@ def caer_video_data_loader(root_dir, mode, num_segments, duration, image_size):
     # Cấu hình số lượng mẫu cứng mỗi nhãn
     if mode == 'train':
         SAMPLES_PER_CLASS = 500
-    else:
-        SAMPLES_PER_CLASS = 100
+    elif mode == 'val':
+        SAMPLES_PER_CLASS = 200
+    else: # test
+        SAMPLES_PER_CLASS = None # Lấy toàn bộ tập Test để có kết quả chính xác nhất
 
     if mode == 'train':
         transform = torchvision.transforms.Compose([
