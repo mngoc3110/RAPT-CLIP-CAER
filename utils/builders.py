@@ -62,28 +62,31 @@ def get_class_info(args: argparse.Namespace) -> Tuple[list, list]:
         class_names: 类别名称，用于混淆矩阵等
         input_text: 输入文本，用于传入模型
     """
-    if args.dataset == "RAER":
+    dataset_name = args.dataset.strip()
+    print(f"DEBUG: get_class_info processing dataset '{dataset_name}'")
+
+    if dataset_name == "RAER":
         class_names = ['Neutrality', 'Enjoyment', 'Confusion', 'Fatigue', 'Distraction']
         class_names_with_context = class_names_with_context_5
         class_descriptor = class_descriptor_5
         ensemble_prompts = prompt_ensemble_5
-    elif args.dataset == "CK+":
+    elif dataset_name == "CK+":
         class_names = class_names_ckplus
         class_names_with_context = class_names_with_context_ckplus
         class_descriptor = class_descriptor_ckplus
         ensemble_prompts = prompt_ensemble_ckplus
-    elif args.dataset == "SFER":
+    elif dataset_name == "SFER":
         class_names = class_names_sfer
         class_names_with_context = class_names_with_context_sfer
         class_descriptor = class_descriptor_sfer
         ensemble_prompts = prompt_ensemble_sfer
-    elif args.dataset == "DAiSEE":
+    elif dataset_name == "DAiSEE":
         class_names = class_names_daisee
         class_names_with_context = class_names_with_context_daisee
         class_descriptor = class_descriptor_daisee
         ensemble_prompts = prompt_ensemble_daisee
     else:
-        raise NotImplementedError(f"Dataset '{args.dataset}' is not implemented yet.")
+        raise NotImplementedError(f"Dataset '{dataset_name}' is not implemented yet.")
 
     if args.text_type == "class_names":
         input_text = class_names
