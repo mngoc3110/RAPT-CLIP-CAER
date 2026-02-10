@@ -93,8 +93,8 @@ python main.py \
   --val-annotation "$ANNOT_DIR/val.txt" \
   --test-annotation "$ANNOT_DIR/test.txt" \
   --clip-path ViT-B/16 \
-  --bounding-box-face "$ROOT_DATA_DIR/face_bbox_dummy.json" \
-  --bounding-box-body "$ROOT_DATA_DIR/body_bbox_dummy.json" \
+  --bounding-box-face "$ANNOT_DIR/dummy_box.json" \
+  --bounding-box-body "$ANNOT_DIR/dummy_box.json" \
   --text-type prompt_ensemble \
   --lambda_dc 0.1 \
   --lambda_mi 0.1 \
