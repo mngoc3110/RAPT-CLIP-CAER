@@ -61,21 +61,17 @@ for root, dirs, files in os.walk(root_kaggle_dir):
 print(f"Total items indexed: {len(clip_path_map)}")
 
 # 2. Parse các file CSV
+# Sử dụng đường dẫn tuyệt đối trực tiếp từ user
 csv_files = {
-    "TrainLabels.csv": "train.txt",
-    "ValidationLabels.csv": "val.txt",
-    "TestLabels.csv": "test.txt"
+    "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TrainLabels.csv": "train.txt",
+    "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/ValidationLabels.csv": "val.txt",
+    "/kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TestLabels.csv": "test.txt"
 }
 
 print("Step 2/3: Parsing CSV labels and mapping to paths...")
-for csv_name, dst_name in csv_files.items():
-    csv_path = os.path.join(labels_dir, csv_name)
+for csv_path, dst_name in csv_files.items():
     if not os.path.exists(csv_path):
-        # Thử tìm ở thư mục cha nếu không thấy
-        csv_path = os.path.join(root_kaggle_dir, csv_name)
-        
-    if not os.path.exists(csv_path):
-        print(f"Warning: Label file {csv_name} not found.")
+        print(f"Warning: Label file {csv_path} not found.")
         continue
         
     df = pd.read_csv(csv_path)
