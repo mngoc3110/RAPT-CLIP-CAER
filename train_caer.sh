@@ -11,7 +11,6 @@ python main.py \
   --gpu 0 \
   --epochs 20 \
   --batch-size 4 \
-  --accumulation-steps 4 \
   --optimizer AdamW \
   --lr 2e-5 \
   --lr-image-encoder 1e-6 \
@@ -35,6 +34,16 @@ python main.py \
   --class-token-position end \
   --class-specific-contexts True \
   --load_and_tune_prompt_learner True \
+  --lambda_dc 0.1 \
+  --dc-warmup 5 \
+  --dc-ramp 10 \
+  --lambda_mi 0.1 \
+  --mi-warmup 5 \
+  --mi-ramp 10 \
   --temperature 0.07 \
-  --use-ldl
+  --use-ldl \
+  --ldl-temperature 1.0 \
+  --use-amp \
+  --grad-clip 1.0 \
+
 
