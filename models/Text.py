@@ -67,3 +67,52 @@ prompt_ensemble_5 = [
         "A photo of a student with a wandering gaze and unfocused eyes."
     ]
 ]
+
+# --- CAER-S (7 classes) ---
+class_names_7 = [
+    "Anger",
+    "Disgust",
+    "Fear",
+    "Happy",
+    "Neutral",
+    "Sad",
+    "Surprise"
+]
+
+prompt_ensemble_7 = [
+    [   # Anger
+        "A photo of a person looking angry.",
+        "A photo of a person with an angry facial expression.",
+        "A photo of a person showing anger in a social context."
+    ],
+    [   # Disgust
+        "A photo of a person looking disgusted.",
+        "A photo of a person showing disgust.",
+        "A photo of a person grimacing in disgust."
+    ],
+    [   # Fear
+        "A photo of a person looking afraid.",
+        "A photo of a person showing fear.",
+        "A photo of a person with a fearful expression."
+    ],
+    [   # Happy
+        "A photo of a person looking happy.",
+        "A photo of a person showing happiness.",
+        "A photo of a person smiling in a social context."
+    ],
+    [   # Neutral
+        "A photo of a person with a neutral expression.",
+        "A photo of a person looking calm and neutral.",
+        "A photo of a person showing no strong emotion."
+    ],
+    [   # Sad
+        "A photo of a person looking sad.",
+        "A photo of a person showing sadness.",
+        "A photo of a person crying or looking downcast."
+    ],
+    [   # Surprise
+        "A photo of a person looking surprised.",
+        "A photo of a person showing surprise.",
+        "A photo of a person with a shocked expression."
+    ]
+]

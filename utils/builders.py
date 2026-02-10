@@ -7,6 +7,8 @@ import torch.utils.data
 from clip import clip
 
 from dataloader.video_dataloader import train_data_loader, test_data_loader
+from dataloader.caer_s_dataloader import caer_s_data_loader
+from dataloader.caer_video_dataloader import caer_video_data_loader
 from models.Generate_Model import GenerateModel
 from models.Text import *
 from utils.utils import get_class_counts
@@ -70,6 +72,16 @@ def get_class_info(args: argparse.Namespace) -> Tuple[list, list]:
         class_names_with_context = class_names_with_context_5
         class_descriptor = class_descriptor_5
         ensemble_prompts = prompt_ensemble_5
+    elif args.dataset == "CAER-S":
+        class_names = class_names_7
+        class_names_with_context = class_names_7 # Fallback to names if no context
+        class_descriptor = class_names_7 # Fallback
+        ensemble_prompts = prompt_ensemble_7
+    elif args.dataset == "CAER" or args.dataset == "CAER_Combined":
+        class_names = class_names_7
+        class_names_with_context = class_names_7
+        class_descriptor = class_names_7
+        ensemble_prompts = prompt_ensemble_7
     else:
         raise NotImplementedError(f"Dataset '{args.dataset}' is not implemented yet.")
 
@@ -99,39 +111,101 @@ def build_dataloaders(args: argparse.Namespace) -> Tuple[torch.utils.data.DataLo
 
     # [LUỒNG 4.2: DATASETS]
     # Khởi tạo Dataset object (đọc video, transform)
-    print("Loading train data...")
-    train_data = train_data_loader(
-        root_dir=args.root_dir, list_file=train_annotation_file_path, num_segments=args.num_segments,
-        duration=args.duration, image_size=args.image_size,dataset_name=args.dataset,
-        bounding_box_face=args.bounding_box_face,bounding_box_body=args.bounding_box_body,
-        crop_body=args.crop_body,
-        num_classes=num_classes
-    )
-    print(f"Total number of training images: {len(train_data)}")
-    
-    print("Loading validation data...")
-    val_data = test_data_loader(
-        root_dir=args.root_dir, list_file=val_annotation_file_path, num_segments=args.num_segments,
-        duration=args.duration, image_size=args.image_size,
-        bounding_box_face=args.bounding_box_face,bounding_box_body=args.bounding_box_body,
-        crop_body=args.crop_body,
-        num_classes=num_classes
-    )
+    if args.dataset == "CAER-S":
+        print("Loading CAER-S train data...")
+        train_data = caer_s_data_loader(
+            root_dir=args.root_dir, mode='train', num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size
+        )
+        print(f"Total number of training images: {len(train_data)}")
+        
+        print("Loading CAER-S validation data...")
+        val_data = caer_s_data_loader(
+            root_dir=args.root_dir, mode='val', num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size
+        )
 
-    print("Loading test data...")
-    test_data = test_data_loader(
-        root_dir=args.root_dir, list_file=test_annotation_file_path, num_segments=args.num_segments,
-        duration=args.duration, image_size=args.image_size,
-        bounding_box_face=args.bounding_box_face,bounding_box_body=args.bounding_box_body,
-        crop_body=args.crop_body,
-        num_classes=num_classes
-    )
+        print("Loading CAER-S test data...")
+        # CAER-S only has train and test
+        test_data = caer_s_data_loader(
+            root_dir=args.root_dir, mode='test', num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size
+        )
+
+    elif args.dataset == "CAER":
+        print("Loading CAER video train data...")
+        train_data = caer_video_data_loader(
+            root_dir=args.root_dir, mode='train', num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size
+        )
+        print(f"Total number of training videos: {len(train_data)}")
+        
+        print("Loading CAER video validation data...")
+        val_data = caer_video_data_loader(
+            root_dir=args.root_dir, mode='val', num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size
+        )
+
+        print("Loading CAER video test data...")
+        test_data = caer_video_data_loader(
+            root_dir=args.root_dir, mode='test', num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size
+        )
+
+    elif args.dataset == "CAER_Combined":
+        print("Loading Combined CAER-S + CAER datasets...")
+        
+        # CAER-S
+        train_s = caer_s_data_loader(root_dir="CAER-S", mode='train', num_segments=args.num_segments, duration=args.duration, image_size=args.image_size)
+        val_s = caer_s_data_loader(root_dir="CAER-S", mode='val', num_segments=args.num_segments, duration=args.duration, image_size=args.image_size)
+        test_s = caer_s_data_loader(root_dir="CAER-S", mode='test', num_segments=args.num_segments, duration=args.duration, image_size=args.image_size)
+        
+        # CAER
+        train_v = caer_video_data_loader(root_dir="CAER", mode='train', num_segments=args.num_segments, duration=args.duration, image_size=args.image_size)
+        val_v = caer_video_data_loader(root_dir="CAER", mode='val', num_segments=args.num_segments, duration=args.duration, image_size=args.image_size)
+        test_v = caer_video_data_loader(root_dir="CAER", mode='test', num_segments=args.num_segments, duration=args.duration, image_size=args.image_size)
+        
+        # Combine
+        train_data = torch.utils.data.ConcatDataset([train_s, train_v])
+        val_data = torch.utils.data.ConcatDataset([val_s, val_v])
+        test_data = torch.utils.data.ConcatDataset([test_s, test_v])
+        
+        print(f"Total Combined Training Samples: {len(train_data)} (Img: {len(train_s)} + Vid: {len(train_v)})")
+
+    else:
+        print("Loading RAER train data...")
+        train_data = train_data_loader(
+            root_dir=args.root_dir, list_file=train_annotation_file_path, num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size,dataset_name=args.dataset,
+            bounding_box_face=args.bounding_box_face,bounding_box_body=args.bounding_box_body,
+            crop_body=args.crop_body,
+            num_classes=num_classes
+        )
+        print(f"Total number of training images: {len(train_data)}")
+        
+        print("Loading RAER validation data...")
+        val_data = test_data_loader(
+            root_dir=args.root_dir, list_file=val_annotation_file_path, num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size,
+            bounding_box_face=args.bounding_box_face,bounding_box_body=args.bounding_box_body,
+            crop_body=args.crop_body,
+            num_classes=num_classes
+        )
+
+        print("Loading RAER test data...")
+        test_data = test_data_loader(
+            root_dir=args.root_dir, list_file=test_annotation_file_path, num_segments=args.num_segments,
+            duration=args.duration, image_size=args.image_size,
+            bounding_box_face=args.bounding_box_face,bounding_box_body=args.bounding_box_body,
+            crop_body=args.crop_body,
+            num_classes=num_classes
+        )
 
     print("Creating DataLoader instances...")
     
     sampler = None
     shuffle = True
-    if args.use_weighted_sampler:
+    if args.use_weighted_sampler and args.dataset != "CAER-S":
         print("=> Using WeightedRandomSampler.")
         class_counts = get_class_counts(train_annotation_file_path)
         class_weights = 1. / torch.tensor(class_counts, dtype=torch.float)

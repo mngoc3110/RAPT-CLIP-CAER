@@ -34,10 +34,19 @@ class GenerateModel(nn.Module):
         self.face_adapter = Adapter(c_in=512, reduction=4)
 
         # For MI Loss
-        hand_crafted_prompts = class_descriptor_5_only_face
+        if len(input_text) == 5:
+            hand_crafted_prompts = class_descriptor_5_only_face
+        else:
+            # Fallback for other datasets (like CAER-S with 7 classes)
+            # If input_text is ensemble, use first prompt of each class
+            if self.is_ensemble:
+                hand_crafted_prompts = [c[0] for c in input_text]
+            else:
+                hand_crafted_prompts = input_text
+                
         self.tokenized_hand_crafted_prompts = torch.cat([clip.tokenize(p) for p in hand_crafted_prompts])
         with torch.no_grad():
-            embedding = clip_model.token_embedding(self.tokenized_hand_crafted_prompts).type(self.dtype)
+            embedding = clip_model.token_embedding(self.tokenized_hand_crafted_prompts.to(clip_model.token_embedding.weight.device)).type(self.dtype)
         self.register_buffer("hand_crafted_prompt_embeddings", embedding)
 
         # [LUỒNG 3.2.3: TEMPORAL MODULE]

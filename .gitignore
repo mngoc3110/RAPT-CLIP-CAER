@@ -18,3 +18,10 @@ __pycache__/
 .idea/
 train/
 test/
+
+# CAER specific
+CAER/
+CAER-S/
+*.zip
+upload_caer_pkg/
+*.log

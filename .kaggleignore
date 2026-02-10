@@ -1,0 +1,6 @@
+# Ignore everything
+*
+
+# But allow these files
+!CAER.zip
+!dataset-metadata.json

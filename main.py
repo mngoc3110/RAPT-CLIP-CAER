@@ -204,7 +204,10 @@ def run_training(args: argparse.Namespace) -> None:
     print("=> Dataloaders built successfully.")
 
     # Loss and optimizer
-    class_counts = get_class_counts(args.train_annotation)
+    if args.dataset == "RAER":
+        class_counts = get_class_counts(args.train_annotation)
+    else:
+        class_counts = None # Not used for CAER-S currently
     
     # [LUỒNG 5: LOSS SELECTION]
     # Quyết định dùng LDL (Label Distribution Learning) hay CrossEntropy chuẩn.
