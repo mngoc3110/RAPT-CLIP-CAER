@@ -1,117 +1,110 @@
 #!/bin/bash
 
 # =================================================================
-# DAiSEE ENGAGEMENT PIPELINE (KAGGLE STABLE VERSION)
+# DAiSEE ENGAGEMENT PIPELINE (KAGGLE CSV-BASED VERSION)
+# Strategy: 
+# 1. Scan Kaggle directory to find actual paths of all videos.
+# 2. Parse DAiSEE CSV labels to get correct Engagement levels.
+# 3. Generate clean train/val/test.txt annotations.
 # =================================================================
 
 # Define Data Directories (Kaggle Input)
-# Dựa trên đường dẫn bạn cung cấp: /kaggle/input/datasets/mngochocsupham/daisee/DAiSEE_data/Labels/TestLabels.csv
 KAGGLE_DATASET_ROOT="/kaggle/input/datasets/mngochocsupham/daisee"
-ROOT_DATA_DIR="$KAGGLE_DATASET_ROOT/DAiSEE_data"
+# Thư mục chứa các file CSV nhãn
+LABELS_DIR="$KAGGLE_DATASET_ROOT/DAiSEE_data/Labels"
 # Writable directory for annotations on Kaggle
 ANNOT_DIR="./daisee_annotations"
 
 # Ensure annotation directory exists
 mkdir -p "$ANNOT_DIR"
 
-# --- Step 1: Fix Paths in Annotation Files ---
-echo "=> Preparing DAiSEE Annotations for Kaggle..."
+# --- Step 1: Generate Annotation Files from CSV ---
+echo "=> Generating DAiSEE Annotations from CSV files..."
 
 python3 - <<EOF
 import os
 import glob
 import json
+import pandas as pd
 
-source_dir = "$ROOT_DATA_DIR"
-target_dir = "$ANNOT_DIR"
 root_kaggle_dir = "$KAGGLE_DATASET_ROOT"
+labels_dir = "$LABELS_DIR"
+target_dir = "$ANNOT_DIR"
 
-files = {
-    "daisee_train.txt": "train.txt",
-    "daisee_val.txt": "val.txt",
-    "daisee_test.txt": "test.txt"
-}
-
-# --- OPTIMIZATION: Build a Lookup Dictionary ---
-print("Scanning dataset to build file index... This may take a moment.")
+# 1. Quét toàn bộ dataset để tạo bản đồ ClipID -> Path thực tế
+print("Step 1/3: Scanning files on disk... (Fast indexing)")
 clip_path_map = {}
-
-# Walk through the entire root directory once
-for root, dirs, files_in_dir in os.walk(root_kaggle_dir):
-    # Check for 'frames' folder
+for root, dirs, files in os.walk(root_kaggle_dir):
+    # Ưu tiên folder 'frames' nếu có (dành cho bản đã extract)
     if os.path.basename(root) == 'frames':
-        # Parent folder name is usually the Clip ID
         clip_id = os.path.basename(os.path.dirname(root))
-        rel_path = os.path.relpath(root, root_kaggle_dir)
-        clip_path_map[clip_id] = rel_path
+        clip_path_map[clip_id] = os.path.relpath(root, root_kaggle_dir)
         continue
-
-    # Check for video files
-    for file in files_in_dir:
+    # Tìm các file video
+    for file in files:
         if file.lower().endswith(('.avi', '.mp4', '.mov')):
             clip_id = os.path.splitext(file)[0]
-            # If we already found a 'frames' folder for this ID, keep it (preferred)
             if clip_id not in clip_path_map:
-                rel_path = os.path.relpath(os.path.join(root, file), root_kaggle_dir)
-                clip_path_map[clip_id] = rel_path
+                clip_path_map[clip_id] = os.path.relpath(os.path.join(root, file), root_kaggle_dir)
 
-print(f"Indexed {len(clip_path_map)} clips.")
+print(f"Indexed {len(clip_path_map)} items.")
 
-def find_clip_path_fast(clip_id):
-    return clip_path_map.get(clip_id)
+# 2. Parse các file CSV
+csv_files = {
+    "TrainLabels.csv": "train.txt",
+    "ValidationLabels.csv": "val.txt",
+    "TestLabels.csv": "test.txt"
+}
 
-for src, dst in files.items():
-    # Tìm file txt nguồn
-    src_path = os.path.join(source_dir, src)
-    if not os.path.exists(src_path):
-        src_path = os.path.join(root_kaggle_dir, src)
+print("Step 2/3: Parsing CSV labels and mapping to paths...")
+for csv_name, dst_name in csv_files.items():
+    csv_path = os.path.join(labels_dir, csv_name)
+    if not os.path.exists(csv_path):
+        # Thử tìm ở thư mục cha nếu không thấy
+        csv_path = os.path.join(root_kaggle_dir, csv_name)
         
-    if not os.path.exists(src_path):
-        print(f"Warning: Source {src} not found in {source_dir} or {root_kaggle_dir}")
+    if not os.path.exists(csv_path):
+        print(f"Warning: Label file {csv_name} not found.")
         continue
         
-    dst_path = os.path.join(target_dir, dst)
+    df = pd.read_csv(csv_path)
     
-    with open(src_path, 'r') as f:
-        lines = f.readlines()
-        
+    # Strip whitespace from column names
+    df.columns = df.columns.str.strip()
+    
     fixed_lines = []
-    found = 0
-    missing = 0
+    found_count = 0
     
-    for line in lines:
-        parts = line.strip().split(' ')
-        if len(parts) < 3: continue
+    for _, row in df.iterrows():
+        # ClipID trong CSV thường là "1100011002.avi"
+        full_clip_name = str(row['ClipID']).strip()
+        clip_id = os.path.splitext(full_clip_name)[0]
         
-        # Lấy Clip ID từ đường dẫn cũ
-        orig_path = parts[0]
-        path_parts = orig_path.split('/')
-        if path_parts[-1] == 'frames':
-            clip_id = path_parts[-2]
-        else:
-            # Handle cases where path might be just a filename or have extension
-            filename = path_parts[-1]
-            clip_id = os.path.splitext(filename)[0]
+        # Lấy nhãn Engagement (0, 1, 2, 3)
+        engagement = int(row['Engagement'])
+        label_id = engagement + 1 # Chuyển sang 1-based (1, 2, 3, 4) cho dataloader
         
-        actual_rel_path = find_clip_path_fast(clip_id)
+        # Tìm đường dẫn thực tế
+        actual_path = clip_path_map.get(clip_id)
         
-        if actual_rel_path:
-            fixed_lines.append(f"{actual_rel_path} {parts[1]} {parts[2]}\n")
-            found += 1
-        else:
-            missing += 1
+        if actual_path:
+            # DAiSEE chuẩn thường là 300 frames. 
+            # Dataloader sẽ tự đếm lại nếu là folder, hoặc dùng số này nếu là video.
+            # Ta để mặc định 300.
+            fixed_lines.append(f"{actual_path} 300 {label_id}\n")
+            found_count += 1
             
-    with open(dst_path, 'w') as f:
+    with open(os.path.join(target_dir, dst_name), 'w') as f:
         f.writelines(fixed_lines)
-    print(f"Processed {dst}: Found {found}, Missing {missing}")
+    print(f"Saved {dst_name}: Matched {found_count}/{len(df)} samples.")
 
-# Create dummy box file
+# 3. Tạo file dummy box
 dummy_box_path = os.path.join(target_dir, "dummy_box.json")
 with open(dummy_box_path, "w") as f:
     json.dump({}, f)
-print(f"Created dummy box file at: {dummy_box_path}")
+print("Step 3/3: Created dummy box file.")
 
-print("Done!")
+print("Done! Annotations are ready.")
 EOF
 
 if [ $? -ne 0 ]; then
@@ -126,7 +119,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 python main.py \
   --mode train \
-  --exper-name Train-DAiSEE-Kaggle \
+  --exper-name Train-DAiSEE-Kaggle-CSV \
   --dataset DAiSEE \
   --gpu 0 \
   --epochs 20 \
