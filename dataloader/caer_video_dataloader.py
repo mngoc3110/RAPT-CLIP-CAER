@@ -48,9 +48,7 @@ class CAERVideoDataset(data.Dataset):
             source_folder = 'train'
         elif self.mode == 'val':
             # Use the dedicated validation folder if available
-            # Note: CAER dataset has 'validation' folder
             source_folder = 'validation'
-            # Fallback if 'validation' doesn't exist but 'val' does (just in case)
             if not os.path.exists(os.path.join(directory, source_folder)) and os.path.exists(os.path.join(directory, 'val')):
                 source_folder = 'val'
         else: # mode == 'test'
@@ -82,8 +80,6 @@ class CAERVideoDataset(data.Dataset):
             print(f"Limiting dataset to {self.samples_per_class} videos per class...")
             random.seed(self.seed)
             for class_idx, samples in samples_per_class_dict.items():
-                # Only shuffle and limit if we need to subsample
-                # If we want deterministic full set (like test), we might not shuffle, but here we enforce limit
                 random.shuffle(samples)
                 selected = samples[:self.samples_per_class]
                 all_samples.extend(selected)
@@ -92,10 +88,6 @@ class CAERVideoDataset(data.Dataset):
             for samples in samples_per_class_dict.values():
                 all_samples.extend(samples)
         
-        # Shuffle final list for training, keep sorted/stable for val/test if desired?
-        # Actually DataLoader handles shuffle for train. 
-        # But for 'val' and 'test', usually we don't need to shuffle inside dataset unless we subsampled.
-        # Let's shuffle all to mix classes in the list (good for batch norm if not shuffling loader)
         random.seed(self.seed)
         random.shuffle(all_samples)
         
@@ -193,8 +185,7 @@ class CAERVideoDataset(data.Dataset):
         return len(self.samples)
 
 def caer_video_data_loader(root_dir, mode, num_segments, duration, image_size):
-    # Cấu hình số lượng mẫu: None nghĩa là lấy TOÀN BỘ (Full Dataset)
-    # Để đảm bảo model học tốt nhất, ta không giới hạn số lượng nữa.
+    # SET TO NONE FOR FULL DATASET
     SAMPLES_PER_CLASS = None 
 
     if mode == 'train':

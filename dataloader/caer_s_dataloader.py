@@ -43,14 +43,19 @@ class CAERSDataset(data.Dataset):
         directory = os.path.expanduser(directory)
         
         # Logic xử lý mode: map to specific folder
-        if self.mode == 'train':
-            source_folder = 'train'
-        elif self.mode == 'val':
-            # Use dedicated validation folder if exists, otherwise try 'val'
-            source_folder = 'validation'
-            if not os.path.exists(os.path.join(directory, source_folder)) and os.path.exists(os.path.join(directory, 'val')):
-                 source_folder = 'val'
-        else: # mode == 'test'
+        # Mặc định lấy từ 'train' nếu không có 'validation' riêng
+        source_folder = 'train'
+        is_explicit_val_folder = False
+
+        if self.mode == 'val':
+            # Check if dedicated validation folder exists
+            if os.path.exists(os.path.join(directory, 'validation')):
+                source_folder = 'validation'
+                is_explicit_val_folder = True
+            elif os.path.exists(os.path.join(directory, 'val')):
+                source_folder = 'val'
+                is_explicit_val_folder = True
+        elif self.mode == 'test':
             source_folder = 'test'
             
         target_dir = os.path.join(directory, source_folder)
@@ -59,7 +64,7 @@ class CAERSDataset(data.Dataset):
         if not os.path.exists(target_dir):
             raise RuntimeError(f"Directory not found: {target_dir}")
 
-        # Collect samples per class to maintain balance when subsampling
+        # Collect ALL samples per class first
         samples_per_class = {}
         
         for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
@@ -74,38 +79,39 @@ class CAERSDataset(data.Dataset):
                         path = os.path.join(root, fname)
                         samples_per_class[class_index].append((path, class_index))
         
-        # Subsampling logic
         all_samples = []
-        
-        # Nếu subsample_ratio > 1, ta hiểu đó là số lượng mẫu cụ thể (samples_per_class)
-        # Nếu < 1, ta hiểu đó là tỷ lệ phần trăm (như cũ)
-        is_fixed_count = self.subsample_ratio > 1
-        
-        if self.subsample_ratio < 1.0 or is_fixed_count:
-            if is_fixed_count:
-                print(f"Limiting dataset to {int(self.subsample_ratio)} samples per class...")
+        random.seed(self.seed) # IMPORTANT: Fixed seed for consistent split
+
+        # Determine if we need to perform manual splitting (Train vs Val from same folder)
+        needs_splitting = (self.mode in ['train', 'val'] and not is_explicit_val_folder and source_folder == 'train')
+
+        for class_idx, samples in samples_per_class.items():
+            # 1. Shuffle FULL list first
+            random.shuffle(samples)
+            
+            # 2. Perform Split (if needed)
+            if needs_splitting:
+                split_idx = int(len(samples) * (1 - self.val_split))
+                if self.mode == 'train':
+                    available_samples = samples[:split_idx]
+                else: # mode == 'val'
+                    available_samples = samples[split_idx:]
             else:
-                print(f"Subsampling dataset with ratio {self.subsample_ratio}...")
+                # Test set or Explicit Validation folder -> Use all
+                available_samples = samples
+
+            # 3. Apply Limit (SAMPLES_PER_CLASS) AFTER splitting
+            if self.subsample_ratio is not None:
+                n_samples = min(len(available_samples), int(self.subsample_ratio))
+                selected = available_samples[:n_samples]
+            else:
+                selected = available_samples
                 
-            random.seed(self.seed) # Ensure reproducible subsampling
-            for class_idx, samples in samples_per_class.items():
-                # Shuffle before picking to get random samples
-                random.shuffle(samples)
-                
-                if is_fixed_count:
-                    n_samples = min(len(samples), int(self.subsample_ratio))
-                else:
-                    n_samples = max(1, int(len(samples) * self.subsample_ratio))
-                    
-                selected = samples[:n_samples]
-                all_samples.extend(selected)
-                print(f"  Class {class_idx}: Selected {len(selected)}/{len(samples)} samples")
-        else:
-            for samples in samples_per_class.values():
-                all_samples.extend(samples)
+            all_samples.extend(selected)
+            if self.subsample_ratio is not None:
+                print(f"  Class {class_idx}: Selected {len(selected)}/{len(available_samples)} samples")
         
-        # Shuffle final list
-        random.seed(self.seed)
+        # Shuffle final dataset for Training
         random.shuffle(all_samples)
         
         print(f"Found {len(all_samples)} samples for {self.mode} set.")
@@ -173,13 +179,9 @@ class CAERSDataset(data.Dataset):
         return len(self.samples)
 
 def caer_s_data_loader(root_dir, mode, num_segments, duration, image_size):
-    # Cấu hình số lượng mẫu cứng mỗi nhãn
-    if mode == 'train':
-        SAMPLES_PER_CLASS = 500
-    elif mode == 'val':
-        SAMPLES_PER_CLASS = 200
-    else: # test
-        SAMPLES_PER_CLASS = None # Lấy toàn bộ tập Test để có kết quả chính xác nhất
+    # Cấu hình số lượng mẫu: None nghĩa là lấy TOÀN BỘ (Full Dataset)
+    # Chiến lược: Full Data + 1 Segment + High Batch Size -> Tối ưu cho MacBook
+    SAMPLES_PER_CLASS = None
 
     # Chúng ta truyền tham số này vào dataset thông qua biến subsample_ratio 
     # (nhưng sửa logic bên trong class Dataset để hiểu đây là số lượng thay vì tỷ lệ)
