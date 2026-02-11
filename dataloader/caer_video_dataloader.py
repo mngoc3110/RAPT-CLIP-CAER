@@ -193,13 +193,9 @@ class CAERVideoDataset(data.Dataset):
         return len(self.samples)
 
 def caer_video_data_loader(root_dir, mode, num_segments, duration, image_size):
-    # Cấu hình số lượng mẫu cứng mỗi nhãn
-    if mode == 'train':
-        SAMPLES_PER_CLASS = 500
-    elif mode == 'val':
-        SAMPLES_PER_CLASS = 200
-    else: # test
-        SAMPLES_PER_CLASS = None # Lấy toàn bộ tập Test để có kết quả chính xác nhất
+    # Cấu hình số lượng mẫu: None nghĩa là lấy TOÀN BỘ (Full Dataset)
+    # Để đảm bảo model học tốt nhất, ta không giới hạn số lượng nữa.
+    SAMPLES_PER_CLASS = None 
 
     if mode == 'train':
         transform = torchvision.transforms.Compose([
