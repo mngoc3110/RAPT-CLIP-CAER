@@ -233,10 +233,25 @@ class DAiSEEDataset(data.Dataset):
                 if img_pil is None:
                     img_pil = Image.new('RGB', (self.image_size, self.image_size))
 
-                # DAiSEE specific: We assume full frame is Face for now if no bbox
-                # Or we can implement a simple center crop if needed.
-                # Here we use the generic _face_detect which returns full image if box is None
-                img_pil_face = self._face_detect(img_pil, None, margin=0, mode='face')
+                # DAiSEE specific: Center Crop if no bbox (Dummy box fallback)
+                # Most DAiSEE videos have the subject in the center.
+                # A 60-70% center crop helps remove background noise.
+                if self.bounding_box_face == "" or "dummy" in self.bounding_box_face:
+                     w, h = img_pil.size
+                     # Crop scale 0.7 seems reasonable for webcam footage
+                     crop_scale = 0.7 
+                     crop_w = w * crop_scale
+                     crop_h = h * crop_scale
+                     
+                     # Ensure we don't crop too small
+                     if crop_w < self.image_size: crop_w = w
+                     if crop_h < self.image_size: crop_h = h
+                     
+                     left = (w - crop_w) / 2
+                     top = (h - crop_h) / 2
+                     img_pil_face = img_pil.crop((left, top, left + crop_w, top + crop_h))
+                else:
+                     img_pil_face = self._face_detect(img_pil, None, margin=0, mode='face')
 
                 # Body stream uses the same image if no cropping
                 img_pil_body = img_pil

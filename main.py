@@ -6,6 +6,10 @@ import random
 import shutil
 import time
 
+# Suppress OpenCV and FFmpeg warnings
+os.environ["OPENCV_LOG_LEVEL"] = "ERROR"
+os.environ["OPENCV_FFMPEG_DEBUG_LOG_LEVEL"] = "0"
+
 import matplotlib
 import numpy as np
 import torch
@@ -42,6 +46,8 @@ exp_group.add_argument('--mode', type=str, default='train', choices=['train', 'e
                        help="Execution mode: 'train' for a full training run, 'eval' for evaluation only.")
 exp_group.add_argument('--eval-checkpoint', type=str,
                        help="Path to the model checkpoint for evaluation mode (e.g., outputs/exp_name/model_best.pth).")
+exp_group.add_argument('--resume', type=str,
+                       help="Path to the model checkpoint to resume training from (e.g., outputs/exp_name/model.pth).")
 exp_group.add_argument('--exper-name', type=str, default='Train', help='A name for the experiment to create a unique output folder.')
 exp_group.add_argument('--dataset', type=str, default='RAER', help='Name of the dataset to use.')
 exp_group.add_argument('--gpu', type=str, default='mps', help='ID of the GPU to use (e.g., 0, 1) or "mps" for Apple Silicon.')
@@ -90,6 +96,7 @@ loss_group.add_argument('--use-weighted-sampler', action='store_true', help='Use
 loss_group.add_argument('--label-smoothing', type=float, default=0.05, help='Label smoothing factor.')
 loss_group.add_argument('--use-ldl', action='store_true', help='Use Semantic Label Distribution Learning (LDL) Loss.')
 loss_group.add_argument('--ldl-temperature', type=float, default=1.0, help='Temperature for LDL target distribution.')
+loss_group.add_argument('--ldl-warmup', type=int, default=5, help='Warmup epochs for LDL loss (during warmup, use CE).')
 loss_group.add_argument('--mixup-alpha', type=float, default=0.2, help='Alpha value for Mixup data augmentation. Set to 0.0 to disable.')
 
 # --- Model & Input ---
@@ -221,11 +228,29 @@ def run_training(args: argparse.Namespace) -> None:
         raise ValueError(f"Optimizer {args.optimizer} not supported.")
 
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.gamma)
+    
+    # Resume from checkpoint
+    if args.resume:
+        if os.path.isfile(args.resume):
+            print(f"=> Loading checkpoint '{args.resume}'")
+            checkpoint = torch.load(args.resume, map_location=args.device)
+            start_epoch = checkpoint['epoch']
+            best_val_uar = checkpoint.get('best_acc', 0.0)
+            model.load_state_dict(checkpoint['state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            if 'recorder' in checkpoint:
+                recorder = checkpoint['recorder']
+            print(f"=> Loaded checkpoint '{args.resume}' (epoch {start_epoch})")
+        else:
+            print(f"=> No checkpoint found at '{args.resume}'")
+
     trainer = Trainer(model, criterion, optimizer, scheduler, args.device, log_txt_path, 
                     mi_criterion=mi_criterion, lambda_mi=args.lambda_mi,
                     dc_criterion=dc_criterion, lambda_dc=args.lambda_dc,
                     mi_warmup=args.mi_warmup, mi_ramp=args.mi_ramp,
-                    dc_warmup=args.dc_warmup, dc_ramp=args.dc_ramp, use_amp=args.use_amp, grad_clip=args.grad_clip)
+                    dc_warmup=args.dc_warmup, dc_ramp=args.dc_ramp, 
+                    use_amp=args.use_amp, grad_clip=args.grad_clip, mixup_alpha=args.mixup_alpha,
+                    use_ldl=args.use_ldl, ldl_warmup=args.ldl_warmup)
     
     for epoch in range(start_epoch, args.epochs):
         inf = f'******************** Epoch: {epoch} ********************'

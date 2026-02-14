@@ -45,46 +45,31 @@ class MILoss(nn.Module):
         return (loss_l2h + loss_h2l) / 2
 
 class LSR2(nn.Module):
-    def __init__(self,e,label_mode):
+    def __init__(self, e=0.1, label_mode='class_descriptor', reduction='mean'):
         super().__init__()
-        self.log_softmax = nn.LogSoftmax(dim=1)
-        self.e = e
-        self.label_mode = label_mode
+        self.epsilon = e
+        self.reduction = reduction
 
-    def _one_hot(self, labels, classes, value=1):
-        one_hot = torch.zeros(labels.size(0), classes)
-        labels = labels.view(labels.size(0), -1)
-        value_added = torch.Tensor(labels.size(0), 1).fill_(value)
-        value_added = value_added.to(labels.device)
-        one_hot = one_hot.to(labels.device)
-        one_hot.scatter_add_(1, labels, value_added)
-        return one_hot
-
-    def _smooth_label(self, target, length, smooth_factor):
-        one_hot = self._one_hot(target, length, value=1 - smooth_factor)
-        mask = (one_hot==0)
+    def forward(self, preds, target):
+        """
+        preds: (B, C) Logits
+        target: (B) LongTensor of labels
+        """
+        n_classes = preds.size(1)
+        log_preds = F.log_softmax(preds, dim=1)
         
-        # Original hardcoded weights for RAER (5 classes)
-        # balance_weight = torch.tensor([0.065267810,0.817977729,1.035884371,0.388144355,0.19551041668]).to(one_hot.device)
+        # Compute standard cross entropy part (for the true label)
+        loss = -log_preds.gather(dim=1, index=target.unsqueeze(1)).squeeze(1)
         
-        # Check if we should use hardcoded weights (only if length is 5)
-        # Otherwise, use uniform weights (all 1s) which effectively implements standard label smoothing
-        if length == 5:
-             balance_weight = torch.tensor([0.065267810,0.817977729,1.035884371,0.388144355,0.19551041668]).to(one_hot.device)
+        # Compute smoothing part (average of all classes)
+        loss = (1 - self.epsilon) * loss + self.epsilon * (-log_preds.mean(dim=1))
+        
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
         else:
-             balance_weight = torch.ones(length).to(one_hot.device)
-
-        ex_weight = balance_weight.expand(one_hot.size(0),-1)
-        resize_weight = ex_weight[mask].view(one_hot.size(0),-1)
-        resize_weight /= resize_weight.sum(dim=1, keepdim=True)
-        one_hot[mask] += (resize_weight*smooth_factor).view(-1)
-        return one_hot.to(target.device)
-    
-    def forward(self, x, target):
-        smoothed_target = self._smooth_label(target, x.size(1), self.e)
-        x = self.log_softmax(x)
-        loss = torch.sum(- x * smoothed_target, dim=1)
-        return torch.mean(loss)
+            return loss
 
 class BlvLoss(nn.Module):
     def __init__(self, cls_num_list, sigma=4, loss_name='BlvLoss'):
@@ -136,9 +121,10 @@ class MoCoRankLoss(nn.Module):
         return loss
 
 class SemanticLDLLoss(nn.Module):
-    def __init__(self, temperature=1.0):
+    def __init__(self, temperature=1.0, target_temperature=0.1):
         super(SemanticLDLLoss, self).__init__()
         self.temperature = temperature
+        self.target_temperature = target_temperature
         self.kl_div = nn.KLDivLoss(reduction='batchmean')
 
     def forward(self, logits, target, text_features):
@@ -148,19 +134,20 @@ class SemanticLDLLoss(nn.Module):
         text_features: (C, D) - Embeddings of class prompts
         """
         # 1. Compute Semantic Similarity between classes based on Text Features
-        # text_features is (C, D), normalized
-        # sim_matrix: (C, C)
-        sim_matrix = torch.matmul(text_features, text_features.T)
+        # Ensure features are normalized for cosine similarity
+        text_features = F.normalize(text_features, p=2, dim=-1)
+        sim_matrix = torch.matmul(text_features, text_features.T) # (C, C)
         
         # 2. Create Soft Target Distributions
         # For each sample, the target distribution is the row in sim_matrix corresponding to the GT label
-        # (B, C)
-        soft_targets = sim_matrix[target]
+        soft_targets = sim_matrix[target] # (B, C)
         
-        # Normalize soft targets to be a valid probability distribution
-        soft_targets = F.softmax(soft_targets / self.temperature, dim=1)
+        # Apply softmax to turn similarities into a valid probability distribution
+        # Use a lower temperature to sharpen the targets (fix for high similarity prompts)
+        soft_targets = F.softmax(soft_targets / self.target_temperature, dim=1)
         
         # 3. Compute Prediction Log-Probabilities
+        # Use the model's temperature (or provided temp) for predictions
         log_probs = F.log_softmax(logits / self.temperature, dim=1)
         
         # 4. KL Divergence Loss

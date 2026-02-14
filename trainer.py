@@ -6,8 +6,9 @@ from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 import os
 import torchvision
+import sys
 
-from utils.utils import AverageMeter, ProgressMeter, get_loss_weight
+from utils.utils import AverageMeter, get_loss_weight
 from utils.loss import SemanticLDLLoss
 
 class Trainer:
@@ -16,13 +17,14 @@ class Trainer:
                  mi_criterion=None, lambda_mi=0, 
                  dc_criterion=None, lambda_dc=0,
                  mi_warmup=0, mi_ramp=0,
-                 dc_warmup=0, dc_ramp=0, use_amp=False, grad_clip=1.0, mixup_alpha=0.0):
+                 dc_warmup=0, dc_ramp=0, use_amp=False, grad_clip=1.0, mixup_alpha=0.0,
+                 use_ldl=False, ldl_warmup=0):
         self.model = model
         self.criterion = criterion
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.device = device
-        self.print_freq = 10
+        self.print_freq = 10 
         self.log_txt_path = log_txt_path
         self.mi_criterion = mi_criterion
         self.lambda_mi = lambda_mi
@@ -35,6 +37,10 @@ class Trainer:
         self.use_amp = use_amp
         self.grad_clip = grad_clip
         self.mixup_alpha = mixup_alpha
+        self.use_ldl = use_ldl
+        self.ldl_warmup = ldl_warmup
+        print(f"DEBUG: Trainer initialized with use_ldl={use_ldl}, ldl_warmup={ldl_warmup}")
+        
         if self.use_amp:
             self.scaler = torch.cuda.amp.GradScaler()
         
@@ -45,7 +51,6 @@ class Trainer:
     def _save_debug_image(self, tensor, prediction, target, epoch_str, batch_idx, img_idx):
         """Saves a single image tensor for debugging, with prediction and target in the filename."""
         # Un-normalize the image
-        # These are common normalization values for ImageNet, adjust if yours are different
         mean = torch.tensor([0.485, 0.456, 0.406], device=tensor.device).view(3, 1, 1)
         std = torch.tensor([0.229, 0.224, 0.225], device=tensor.device).view(3, 1, 1)
         tensor = tensor * std + mean
@@ -80,10 +85,10 @@ class Trainer:
         """Runs one epoch of training or validation."""
         if is_train:
             self.model.train()
-            prefix = f"Train Epoch: [{epoch_str}]"
+            mode_str = "Train"
         else:
             self.model.eval()
-            prefix = f"Valid Epoch: [{epoch_str}]"
+            mode_str = "Valid"
 
         losses = AverageMeter('Loss', ':.4e')
         mi_losses = AverageMeter('MI Loss', ':.4e')
@@ -91,44 +96,39 @@ class Trainer:
         moco_losses = AverageMeter('MoCo Loss', ':.4e')
         war_meter = AverageMeter('WAR', ':6.2f')
         
-        progress_meters = [losses, war_meter]
-        if self.mi_criterion is not None:
-            progress_meters.insert(1, mi_losses)
-        if self.dc_criterion is not None:
-            progress_meters.insert(2, dc_losses)
+        # Lists to store predictions for UAR calculation
+        all_preds_list = []
+        all_targets_list = []
         
-        # Add MoCo loss to progress meter if moco is enabled in model
-        if hasattr(self.model, 'args') and hasattr(self.model.args, 'use_moco') and self.model.args.use_moco:
-            progress_meters.insert(-1, moco_losses)
-
-        progress = ProgressMeter(
-            len(loader), 
-            progress_meters, 
-            prefix=prefix, 
-            log_txt_path=self.log_txt_path  
-        )
-
-        all_preds = []
-        all_targets = []
         saved_images_count = 0
 
         # Print weights at the start of training epoch
         if is_train:
             mi_weight = get_loss_weight(int(epoch_str), self.mi_warmup, self.mi_ramp, self.lambda_mi)
             dc_weight = get_loss_weight(int(epoch_str), self.dc_warmup, self.dc_ramp, self.lambda_dc)
-            weight_msg = f"--- Loss Weights for Epoch {epoch_str}: MI={mi_weight:.4f}, DC={dc_weight:.4f}, MoCo=1.0000 ---"
+            
+            # Determine effective LDL weight (warmup)
+            ldl_weight = 1.0
+            if self.use_ldl and int(epoch_str) < self.ldl_warmup:
+                ldl_weight = 0.0 # Disable LDL during warmup
+            
+            # MoCo weight display (typically fixed at 1.0 if enabled)
+            moco_weight = 0.0
+            if hasattr(self.model, 'args') and hasattr(self.model.args, 'use_moco') and self.model.args.use_moco:
+                moco_weight = 1.0
+                
+            weight_msg = f"--- Epoch {epoch_str}: MI={mi_weight:.4f}, DC={dc_weight:.4f}, LDL_Wt={ldl_weight:.1f}, MoCo={moco_weight:.1f} ---"
             print(weight_msg)
             with open(self.log_txt_path, 'a') as f:
                 f.write(weight_msg + '\n')
 
         context = torch.enable_grad() if is_train else torch.no_grad()
         
+        # Use tqdm for progress bar
+        pbar = tqdm(loader, desc=f"{mode_str} Epoch {epoch_str}", file=sys.stdout)
+        
         with context:
-            for i, (images_face, images_body, target) in enumerate(loader):
-                # Debugging: Print batch information
-                if is_train and i % 100 == 0:
-                    print(f"--> Batch {i}, Size: {target.size(0)}")
-
+            for i, (images_face, images_body, target) in enumerate(pbar):
                 images_face = images_face.to(self.device)
                 images_body = images_body.to(self.device)
                 target = target.to(self.device)
@@ -150,17 +150,41 @@ class Trainer:
                         processed_learnable_text_features = learnable_text_features.view(num_classes, num_prompts_per_class, -1).mean(dim=1)
 
                     # Calculate loss
-                    if isinstance(self.criterion, SemanticLDLLoss):
+                    # Check if we should use LDL (after warmup) or fallback to CE
+                    current_criterion = self.criterion
+                    if self.use_ldl and int(epoch_str) < self.ldl_warmup:
+                         # Fallback to standard CE during warmup if using LDL wrapper
+                         # But self.criterion is SemanticLDLLoss. We need a simple CE.
+                         # Assuming we can just compute CE here or use a separate criterion.
+                         # Simpler: SemanticLDLLoss already handles temperature. If we want HARD labels,
+                         # we can just use F.cross_entropy.
+                         current_criterion = torch.nn.CrossEntropyLoss()
+                    
+                    if isinstance(current_criterion, SemanticLDLLoss):
                         if is_train and self.mixup_alpha > 0:
-                            classification_loss = lam * self.criterion(output, target, processed_learnable_text_features) + \
-                                                  (1 - lam) * self.criterion(output, target_b, processed_learnable_text_features)
+                            classification_loss = lam * current_criterion(output, target, processed_learnable_text_features) + \
+                                                  (1 - lam) * current_criterion(output, target_b, processed_learnable_text_features)
                         else:
-                            classification_loss = self.criterion(output, target, processed_learnable_text_features)
+                            classification_loss = current_criterion(output, target, processed_learnable_text_features)
                     else:
+                        # Standard CE or LSR
                         if is_train and self.mixup_alpha > 0:
-                            classification_loss = lam * self.criterion(output, target) + (1 - lam) * self.criterion(output, target_b)
+                            classification_loss = lam * current_criterion(output, target) + (1 - lam) * current_criterion(output, target_b)
                         else:
-                            classification_loss = self.criterion(output, target)
+                            classification_loss = current_criterion(output, target)
+                    
+                    # DEBUG: Print details for the first batch of the first epoch
+                    if is_train and int(epoch_str) == 0 and i == 0:
+                        print(f"\n[DEBUG] Batch 0 Check:")
+                        print(f"  Logits Shape: {output.shape}")
+                        print(f"  Target Shape: {target.shape}")
+                        print(f"  Target Min/Max: {target.min().item()} / {target.max().item()}")
+                        print(f"  Logits (first 2): {output[:2].detach().cpu().numpy()}")
+                        print(f"  Targets (first 2): {target[:2].detach().cpu().numpy()}")
+                        print(f"  CE/LDL Loss: {classification_loss.item():.6f}")
+                        if hasattr(self.model, 'args') and hasattr(self.model.args, 'temperature'):
+                             print(f"  Model Temperature: {self.model.args.temperature}")
+
                     loss = classification_loss
 
                     if is_train and self.mi_criterion is not None:
@@ -204,8 +228,9 @@ class Trainer:
                 losses.update(loss.item(), target.size(0))
                 war_meter.update(acc, target.size(0))
 
-                all_preds.append(preds.cpu())
-                all_targets.append(target.cpu())
+                # Collect preds for UAR
+                all_preds_list.append(preds.cpu())
+                all_targets_list.append(target.cpu())
 
                 if not is_train and saved_images_count < 32:
                     for img_idx in range(images_face.size(0)):
@@ -221,22 +246,38 @@ class Trainer:
                             saved_images_count += 1
                         else:
                             break
-
-
-                if i % self.print_freq == 0:
-                    progress.display(i)
+                
+                # Update progress bar with Running UAR
+                running_uar = 0.0
+                if len(all_preds_list) > 0:
+                    curr_preds = torch.cat(all_preds_list).numpy()
+                    curr_targets = torch.cat(all_targets_list).numpy()
+                    # Only calc UAR every 10 batches to save CPU time
+                    if i % 10 == 0: 
+                        try:
+                            cm = confusion_matrix(curr_targets, curr_preds, labels=range(output.shape[1]))
+                            class_acc = cm.diagonal() / (cm.sum(axis=1) + 1e-6)
+                            running_uar = np.nanmean(class_acc) * 100
+                        except:
+                            pass
+                
+                pbar.set_postfix({
+                    'Loss': f"{losses.avg:.4f}",
+                    'WAR': f"{war_meter.avg:.2f}%",
+                    'UAR': f"{running_uar:.2f}%"
+                })
         
         # Calculate epoch-level metrics
-        all_preds = torch.cat(all_preds)
-        all_targets = torch.cat(all_targets)
+        all_preds = torch.cat(all_preds_list)
+        all_targets = torch.cat(all_targets_list)
         
         cm = confusion_matrix(all_targets.numpy(), all_preds.numpy())
-        war = war_meter.avg # Weighted Average Recall (WAR) is just the overall accuracy
+        war = war_meter.avg 
         
-        # Unweighted Average Recall (UAR)
-        class_acc = cm.diagonal() / (cm.sum(axis=1) + 1e-6) # Add epsilon to avoid division by zero
+        class_acc = cm.diagonal() / (cm.sum(axis=1) + 1e-6)
         uar = np.nanmean(class_acc) * 100
 
+        prefix = f"{mode_str} Epoch: [{epoch_str}]"
         logging.info(f"{prefix} * WAR: {war:.3f} | UAR: {uar:.3f}")
         with open(self.log_txt_path, 'a') as f:
             f.write('Current WAR: {war:.3f}'.format(war=war) + '\n')

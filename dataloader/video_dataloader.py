@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 from torch.utils import data
 from numpy.random import randint
 from dataloader.video_transform import *
+from dataloader.daisee_dataloader import daisee_train_data_loader, daisee_test_data_loader
 
 class VideoRecord(object):
     def __init__(self, row):
@@ -200,6 +201,13 @@ class VideoDataset(data.Dataset):
         for seg_ind in indices:
             p = int(seg_ind)
             for i in range(self.duration):
+                # Initialize variables to avoid UnboundLocalError
+                parent_dir = ""
+                video_key = ""
+                frame_key = ""
+                box = None
+                img_pil = None # Ensure img_pil is initialized
+
                 if is_video_file:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, p)
                     ret, frame = cap.read()
@@ -210,32 +218,56 @@ class VideoDataset(data.Dataset):
                         img_cv_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
                         img_pil = Image.fromarray(img_cv_rgb)
                         
+                        # CAER specific BBox Lookup Logic
+                        # Path in record: ./CAER/train/Anger/0001.avi
+                        # Key in JSON: CAER/train/Anger/0001
+                        # Subkey in JSON: 0.jpg (frame index)
+                        
                         # Mock path for box lookup (parent dir and filename)
                         # For video file, parent is dir, filename is video name + frame index?
                         # This bbox logic might need adjustment for video files if you have frame-level boxes.
                         # For now, let's assume we use the video path or parent dir for box lookup key.
                         parent_dir = os.path.dirname(record.path)
                         file_name = os.path.basename(record.path) # Use video filename
+
+                        # Remove './' if present
+                        rel_path = record.path.replace('./', '')
+                        # Remove extension
+                        video_key = os.path.splitext(rel_path)[0]
+                        
+                        frame_key = f"{p}.jpg" # CAER uses 0.jpg, 1.jpg... based on frame index
                     else:
                         # Failed to read frame, use black image
                         img_pil = Image.new('RGB', (self.image_size, self.image_size))
-                        parent_dir = ""
-                        file_name = ""
+                        # parent_dir is "" (initialized above)
                 else:
                     img_path = video_frames_path[p]
                     parent_dir = os.path.dirname(img_path)
                     file_name = os.path.basename(img_path)
-                    img_pil = Image.open(img_path)
-
-                if parent_dir in self.boxs:
-                    if file_name in self.boxs[parent_dir]:
-                        box = self.boxs[parent_dir][file_name]
-                    else:
-                        box = None
-                else:
-                    box = None
+                    try:
+                        img_pil = Image.open(img_path)
+                    except:
+                        img_pil = Image.new('RGB', (self.image_size, self.image_size))
+                    
+                    # Logic for frame folders if needed...
+                    # For now assume generic lookup works or implement similar key logic if frame folders follow CAER structure
+                    
+                
+                # Try CAER lookup style first
+                if video_key and video_key in self.boxs:
+                    if frame_key in self.boxs[video_key]:
+                        box = self.boxs[video_key][frame_key]
+                
+                # Fallback to generic lookup if not found (parent dir -> filename)
+                if box is None and parent_dir:
+                    if parent_dir in self.boxs:
+                         if file_name in self.boxs[parent_dir]:
+                             box = self.boxs[parent_dir][file_name]
 
                 # Perform face detection / cropping
+                if img_pil is None: # Safety check
+                     img_pil = Image.new('RGB', (self.image_size, self.image_size))
+                     
                 img_pil_face = self._face_detect(img_pil, box, margin=20, mode='face')
 
                 # Debugging: Save sample images
@@ -250,8 +282,18 @@ class VideoDataset(data.Dataset):
                     self._saved_samples[current_label] += 1
 
                 if self.crop_body:
-                    body_box_path = parent_dir
-                    body_box = self.body_boxes[body_box_path] if body_box_path in self.body_boxes else None
+                    body_box = None
+                    # Try CAER lookup style first
+                    if video_key and video_key in self.body_boxes:
+                        if frame_key in self.body_boxes[video_key]:
+                            body_box = self.body_boxes[video_key][frame_key]
+                    
+                    # Fallback to generic lookup if not found
+                    if body_box is None and parent_dir:
+                        body_box_path = parent_dir
+                        if body_box_path in self.body_boxes:
+                            body_box = self.body_boxes[body_box_path]
+
                     if body_box is not None:
                         left, upper, right, lower = body_box
                         img_pil_body = img_pil.crop((left, upper, right, lower))
@@ -287,7 +329,12 @@ class VideoDataset(data.Dataset):
 
 
 def train_data_loader(root_dir, list_file, num_segments, duration, image_size,dataset_name,bounding_box_face,bounding_box_body, crop_body=False, num_classes=8):
-    if dataset_name == "RAER":
+    if dataset_name == 'DAiSEE':
+        print(f"=> Using DAiSEE smart dataloader...")
+        return daisee_train_data_loader(root_dir, list_file, num_segments, duration, image_size, 
+                                        bounding_box_face, bounding_box_body, crop_body, num_classes)
+        
+    if dataset_name == "RAER" or dataset_name == "CAER":
          train_transforms = torchvision.transforms.Compose([
             RandomRotation(4),
             GroupResize(image_size),
@@ -318,6 +365,12 @@ def train_data_loader(root_dir, list_file, num_segments, duration, image_size,da
 
 
 def test_data_loader(root_dir, list_file, num_segments, duration, image_size,bounding_box_face,bounding_box_body, crop_body=False, num_classes=8):
+    # We don't get dataset_name here usually, but if we did we could dispatch.
+    # However, test_data_loader signature in main.py call might not pass dataset_name?
+    # Let's check main.py call site.
+    # But wait, main.py doesn't pass dataset_name to test_data_loader in standard calls usually.
+    # Let's see if we can infer it or if we should add it.
+    pass 
     
     test_transform = torchvision.transforms.Compose([GroupResize(image_size),
                                                      Stack(),

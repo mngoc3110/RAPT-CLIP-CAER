@@ -22,13 +22,13 @@ python main.py \
   --image-size 224 \
   --seed 42 \
   --print-freq 10 \
-  --root-dir /kaggle/input/raer-video-emotion-dataset \
-  --train-annotation /kaggle/input/raer-annot/annotation/train_80.txt \
-  --val-annotation /kaggle/input/raer-annot/annotation/val_20.txt \
-  --test-annotation /kaggle/input/raer-annot/annotation/test.txt \
+  --root-dir ./ \
+  --train-annotation RAER/annotation/train_80.txt \
+  --val-annotation RAER/annotation/val_20.txt \
+  --test-annotation RAER/annotation/test.txt \
   --clip-path ViT-B/16 \
-  --bounding-box-face /kaggle/input/raer-video-emotion-dataset/RAER/bounding_box/face.json \
-  --bounding-box-body /kaggle/input/raer-video-emotion-dataset/RAER/bounding_box/body.json \
+  --bounding-box-face RAER/bounding_box/face.json \
+  --bounding-box-body RAER/bounding_box/body.json \
   --text-type prompt_ensemble \
   --contexts-number 8 \
   --class-token-position end \
@@ -41,8 +41,6 @@ python main.py \
   --mi-warmup 5 \
   --mi-ramp 10 \
   --temperature 0.07 \
-  --use-ldl \
-  --ldl-temperature 1.0 \
   --use-moco \
   --moco-k 4096 \
   --moco-m 0.99 \

@@ -6,8 +6,10 @@ class Adapter(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(c_in, c_in // reduction, bias=False),
             nn.ReLU(inplace=True),
+            nn.Dropout(0.5), # Add Dropout
             nn.Linear(c_in // reduction, c_in, bias=False),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.5)  # Add Dropout
         )
 
     def forward(self, x):

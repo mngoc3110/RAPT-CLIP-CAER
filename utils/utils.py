@@ -221,6 +221,9 @@ def computer_uar_war(val_loader, model, device, class_names, log_confusion_matri
     # 5. 绘制混淆矩阵
     plt.figure(figsize=(10, 8))
     plot_confusion_matrix(normalized_cm_percent, classes=class_names, normalize=True, title=title) # normalize=False因为我们已经手动归一化
+    
+    # Ensure directory exists before saving
+    os.makedirs(os.path.dirname(log_confusion_matrix_path), exist_ok=True)
     plt.savefig(log_confusion_matrix_path)
     plt.close()
     

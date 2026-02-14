@@ -280,8 +280,69 @@ prompt_ensemble_sfer = [
     ]
 ]
 
-# DAiSEE Engagement Levels (4 classes: Very Low, Low, High, Very High)
-class_names_daisee = ['Very Low Engagement', 'Low Engagement', 'High Engagement', 'Very High Engagement']
+# CAER Classes (Alphabetical: Anger, Disgust, Fear, Happy, Neutral, Sad, Surprise)
+class_names_caer = ['Anger', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+
+class_names_with_context_caer = [
+    "A person shows anger.",
+    "A person shows disgust.",
+    "A person shows fear.",
+    "A person shows happiness.",
+    "A person shows neutrality.",
+    "A person shows sadness.",
+    "A person shows surprise."
+]
+
+class_descriptor_caer = [
+    "A person with an angry expression, furrowed brows and tightened lips.",
+    "A person with a disgusted expression, nose wrinkled and upper lip raised.",
+    "A person with a fearful expression, eyes wide open and eyebrows raised.",
+    "A person with a happy expression, smiling with cheeks raised.",
+    "A person with a neutral expression, relaxed face and calm gaze.",
+    "A person with a sad expression, corners of the lips turned down and drooping eyelids.",
+    "A person with a surprised expression, mouth open and eyes widened."
+]
+
+prompt_ensemble_caer = [
+    [ # Anger
+        "A photo of a person showing anger.",
+        "A face with furrowed brows and a glare.",
+        "An angry facial expression."
+    ],
+    [ # Disgust
+        "A photo of a person showing disgust.",
+        "A face with a wrinkled nose.",
+        "A disgusted facial expression."
+    ],
+    [ # Fear
+        "A photo of a person showing fear.",
+        "A face with wide eyes and a terrified look.",
+        "A fearful facial expression."
+    ],
+    [ # Happy
+        "A photo of a person showing happiness.",
+        "A smiling face with joy.",
+        "A happy facial expression."
+    ],
+    [ # Neutral
+        "A photo of a person showing a neutral expression.",
+        "A calm face with no strong emotion.",
+        "A neutral facial expression."
+    ],
+    [ # Sad
+        "A photo of a person showing sadness.",
+        "A face with a frown and sorrowful eyes.",
+        "A sad facial expression."
+    ],
+    [ # Surprise
+        "A photo of a person showing surprise.",
+        "A face with an open mouth and wide eyes.",
+        "A surprised facial expression."
+    ]
+]
+
+
+class_names_daisee = ['Very Low', 'Low', 'High', 'Very High']
 
 class_names_with_context_daisee = [
     "A student shows very low engagement.",

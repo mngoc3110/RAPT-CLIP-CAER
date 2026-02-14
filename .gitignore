@@ -1,14 +1,24 @@
 # Ignore dataset
 raer/
-
-# Ignore training outputs / checkpoints / logs
-outputs/
-ckplus/debug_predictions/
-debug_samples/
-__pycache__/
-outputs/
+CAER/
+CAER-S/
 CKPlus_Dataset/
 DAiSEE/
 Student_FER_Dataset/
-debug_samples/
+
+# Annotations (generated)
+daisee_annotations/
+caer_annotations/
+
+# Ignore training outputs / checkpoints / logs
+outputs/
 debug_predictions/
+debug_samples/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Temporary Scripts
+run_daisee.sh
+debug_dataloader_*.py
+train_daisee_local.sh

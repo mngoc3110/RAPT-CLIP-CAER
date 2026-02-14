@@ -10,7 +10,7 @@ ANNOT_DIR="$ROOT_DATA_DIR/annotations"
 
 # Default checkpoint path (Update this after training!)
 # This is a placeholder; user should provide the path or update it.
-DEFAULT_CHECKPOINT="outputs/Train-SFER-[DATE]-[TIME]/model_best.pth"
+DEFAULT_CHECKPOINT="outputs/Train-SFER-Stable-[02-10]-[11:46]/model_best.pth"
 
 CHECKPOINT="${1:-$DEFAULT_CHECKPOINT}"
 

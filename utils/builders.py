@@ -85,6 +85,11 @@ def get_class_info(args: argparse.Namespace) -> Tuple[list, list]:
         class_names_with_context = class_names_with_context_daisee
         class_descriptor = class_descriptor_daisee
         ensemble_prompts = prompt_ensemble_daisee
+    elif dataset_name == "CAER":
+        class_names = class_names_caer
+        class_names_with_context = class_names_with_context_caer
+        class_descriptor = class_descriptor_caer
+        ensemble_prompts = prompt_ensemble_caer
     else:
         raise NotImplementedError(f"Dataset '{dataset_name}' is not implemented yet.")
 
