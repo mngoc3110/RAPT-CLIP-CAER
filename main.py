@@ -86,6 +86,7 @@ optim_group.add_argument('--gamma', type=float, default=0.1, help='Factor for le
 
 # --- Loss & Imbalance Handling ---
 loss_group = parser.add_argument_group('Loss & Imbalance Handling', 'Parameters for loss functions and imbalance handling')
+loss_group.add_argument('--loss-type', type=str, default='ce', choices=['ce', 'ldl', 'ldam'], help='Type of primary classification loss (ce, ldl, ldam).')
 loss_group.add_argument('--lambda_mi', type=float, default=0.1, help='Weight for the Mutual Information loss.')
 loss_group.add_argument('--lambda_dc', type=float, default=0.1, help='Weight for the Decorrelation loss.')
 loss_group.add_argument('--mi-warmup', type=int, default=5, help='Warmup epochs for MI loss.')
@@ -197,10 +198,38 @@ def run_training(args: argparse.Namespace) -> None:
     train_loader, val_loader, test_loader = build_dataloaders(args)
     print("=> Dataloaders built successfully.")
 
+    # Calculate cls_num_list for LDAM or other imbalance handling
+    cls_num_list = [0] * len(class_names)
+    # Check if dataset has video_list (standard VideoDataset)
+    if hasattr(train_loader.dataset, 'video_list'):
+        print(f"=> Calculating class distribution from video_list...")
+        for record in train_loader.dataset.video_list:
+            # Labels in RAER/CAER annotations are typically 1-based (e.g., 1..8)
+            # VideoDataset.__getitem__ returns label-1.
+            # So we map record.label (1-based) to 0-based index.
+            label_idx = record.label - 1
+            if 0 <= label_idx < len(cls_num_list):
+                cls_num_list[label_idx] += 1
+    else:
+        # Fallback or warning if dataset structure is different
+        print("=> Warning: Could not calculate class distribution directly from dataset. Using uniform distribution placeholder if needed.")
+        # Attempt to infer from simple iteration if small, but likely too slow. 
+        # For now, just warn. LDAM might fail or perform poorly if this is zero.
+        pass
+    
+    print(f"=> Class distribution (Training): {cls_num_list}")
+
     # Loss and optimizer
     if args.use_ldl:
         print(f"=> Using SemanticLDLLoss (LDL) with temperature {args.ldl_temperature}")
         criterion = SemanticLDLLoss(temperature=args.ldl_temperature).to(args.device)
+    elif args.loss_type == 'ldam':
+        if sum(cls_num_list) > 0:
+            print(f"=> Using LDAM Loss with s=30, max_m=0.5")
+            criterion = LDAMLoss(cls_num_list=cls_num_list, max_m=0.5, s=30).to(args.device)
+        else:
+            print("=> Error: cls_num_list is empty/zero. Cannot use LDAM. Falling back to CrossEntropy.")
+            criterion = nn.CrossEntropyLoss().to(args.device)
     elif args.label_smoothing > 0:
         criterion = LSR2(e=args.label_smoothing, label_mode='class_descriptor').to(args.device)
     else:

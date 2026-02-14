@@ -42,29 +42,29 @@ class_descriptor_5 = [
 # Each inner list contains multiple descriptions for a single class.
 prompt_ensemble_5 = [
     [   # Neutral
-        "A photo of a student with a neutral expression.",
-        "A photo of a student sitting still and watching the lecture.",
-        "A photo of a student with a calm face and neutral body posture."
+        "A photo of a student being alert and looking straight ahead.",
+        "A photo of a student with a calm and steady gaze.",
+        "A photo of a student paying attention with a neutral expression."
     ],
     [   # Enjoyment
-        "A photo of a student showing enjoyment while learning.",
-        "A photo of a student with a happy face and a slight smile.",
-        "A photo of a student who looks engaged and interested in the lesson."
+        "A photo of a student smiling and looking happy.",
+        "A photo of a student showing joy and enthusiasm.",
+        "A photo of a student appearing pleased and engaged."
     ],
     [   # Confusion
-        "A photo of a student who is confused.",
-        "A photo of a student with a puzzled look and furrowed eyebrows.",
-        "A photo of a student staring at the material as if trying to understand."
+        "A photo of a student frowning with a puzzled expression.",
+        "A photo of a student scratching their head or looking confused.",
+        "A photo of a student trying hard to understand but failing."
     ],
     [   # Fatigue
-        "A photo of a student who appears fatigued or sleepy.",
-        "A photo of a student with drooping eyelids or yawning.",
-        "A photo of a student showing low energy with a lowered head."
+        "A photo of a student yawning or falling asleep.",
+        "A photo of a student with heavy drooping eyelids.",
+        "A photo of a student resting their head, looking very tired."
     ],
     [   # Distraction
-        "A photo of a student who is distracted from learning.",
-        "A photo of a student looking away from the lesson or checking a phone.",
-        "A photo of a student with a wandering gaze and unfocused eyes."
+        "A photo of a student looking away from the screen.",
+        "A photo of a student turning their head to the side.",
+        "A photo of a student engaging in other activities, not studying."
     ]
 ]
 

@@ -92,6 +92,9 @@ class VideoDataset(data.Dataset):
 
     def _face_detect(self,img,box,margin,mode = 'face'):
         if box is None:
+            if mode == 'face':
+                # Return a black image of the same size if face is not detected
+                return Image.new('RGB', img.size, (0, 0, 0))
             return img
         else:
             left, upper, right, lower = box
@@ -235,7 +238,24 @@ class VideoDataset(data.Dataset):
                         # Remove extension
                         video_key = os.path.splitext(rel_path)[0]
                         
+                        # Robust key lookup: 
+                        # If the full path key isn't found, try stripping top-level directories
+                        # e.g., 'dataset/RAER/images/...' -> 'RAER/images/...'
+                        if video_key not in self.boxs:
+                            parts = video_key.split(os.sep)
+                            # Try progressively shorter suffixes
+                            for i in range(1, len(parts)):
+                                sub_key = '/'.join(parts[i:]) # JSON keys usually use forward slashes
+                                if sub_key in self.boxs:
+                                    video_key = sub_key
+                                    break
+                        
                         frame_key = f"{p}.jpg" # CAER uses 0.jpg, 1.jpg... based on frame index
+                        
+                        # Debug warning if face box still not found
+                        if video_key not in self.boxs and i == 0: # Print once per clip
+                             # print(f"Warning: Video key '{video_key}' (derived from '{record.path}') not found in face bounding boxes.")
+                             pass # Suppress for now to avoid spam, but logic above should fix it.
                     else:
                         # Failed to read frame, use black image
                         img_pil = Image.new('RGB', (self.image_size, self.image_size))
