@@ -12,6 +12,17 @@ from numpy.random import randint
 from dataloader.video_transform import *
 from dataloader.daisee_dataloader import daisee_train_data_loader, daisee_test_data_loader
 
+# Custom Transform for List of Images (Group Transform)
+class GroupRandomGrayscale(object):
+    def __init__(self, p=0.1):
+        self.p = p
+
+    def __call__(self, img_group):
+        if random.random() < self.p:
+            # Convert to Grayscale (L) then back to RGB to keep 3 channels
+            return [img.convert('L').convert('RGB') for img in img_group]
+        return img_group
+
 class VideoRecord(object):
     def __init__(self, row):
         self._data = row
@@ -134,16 +145,16 @@ class VideoDataset(data.Dataset):
 
 
     def _parse_list(self):
-        #
+        # 
         # Data Form: [video_id, num_frames, class_idx]
-        #
+        # 
         self.video_list = [VideoRecord([os.path.join(self.root_dir, item[0])] + item[1:]) for item in self.sample_list]
         print(('video number:%d' % (len(self.video_list))))
 
     def _get_train_indices(self, record):
         # 
         # Split all frames into seg parts, then select frame in each part randomly
-        #
+        # 
         average_duration = (record.num_frames - self.duration + 1) // self.num_segments
         if average_duration > 0:
             offsets = np.multiply(list(range(self.num_segments)), average_duration) + randint(average_duration, size=self.num_segments)
@@ -156,7 +167,7 @@ class VideoDataset(data.Dataset):
     def _get_test_indices(self, record):
         # 
         # Split all frames into seg parts, then select frame in the mid of each part
-        #
+        # 
         if record.num_frames > self.num_segments + self.duration - 1:
             tick = (record.num_frames - self.duration + 1) / float(self.num_segments)
             offsets = np.array([int(tick / 2.0 + tick * x) for x in range(self.num_segments)])
@@ -334,10 +345,9 @@ def train_data_loader(root_dir, list_file, num_segments, duration, image_size,da
         
     if dataset_name == "RAER" or dataset_name == "CAER":
          train_transforms = torchvision.transforms.Compose([
-            torchvision.transforms.RandomApply([
-                torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2)
-            ], p=0.8),
-            torchvision.transforms.RandomGrayscale(p=0.2), # Ép model học hình khối (structural features)
+            # Apply ColorJitter from video_transform (works on list of images)
+            ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2), 
+            GroupRandomGrayscale(p=0.2), # Custom transform for list of images
             RandomRotation(4),
             GroupResize(image_size),
             GroupRandomHorizontalFlip(),
