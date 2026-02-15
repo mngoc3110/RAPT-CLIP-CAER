@@ -129,6 +129,11 @@ class Trainer:
         
         with context:
             for i, (images_face, images_body, target) in enumerate(pbar):
+                # DEBUG: Check for NaN in inputs
+                if torch.isnan(images_face).any() or torch.isinf(images_face).any():
+                    print(f"\n[CRITICAL ERROR] NaN/Inf detected in images_face at batch {i}!")
+                    # raise ValueError("Input images_face contains NaN")
+                
                 images_face = images_face.to(self.device)
                 images_body = images_body.to(self.device)
                 target = target.to(self.device)
@@ -141,6 +146,12 @@ class Trainer:
                     # Forward pass
                     output, learnable_text_features, hand_crafted_text_features, moco_logits = self.model(images_face, images_body)
                     
+                    # DEBUG: Check model output for NaN
+                    if torch.isnan(output).any():
+                        print(f"\n[CRITICAL ERROR] Model output contains NaN at batch {i}!")
+                        print(f"  Input Min/Max: {images_face.min().item():.4f} / {images_face.max().item():.4f}")
+                        # Check intermediates if possible or just break
+                        
                     # For MI and DC losses, if using prompt ensembling, average the learnable_text_features
                     processed_learnable_text_features = learnable_text_features
                     if hasattr(self.model, 'is_ensemble') and self.model.is_ensemble:
@@ -179,7 +190,9 @@ class Trainer:
                         print(f"  Logits Shape: {output.shape}")
                         print(f"  Target Shape: {target.shape}")
                         print(f"  Target Min/Max: {target.min().item()} / {target.max().item()}")
-                        print(f"  Logits (first 2): {output[:2].detach().cpu().numpy()}")
+                        # Handle NaN print safely
+                        logits_np = output[:2].detach().cpu().numpy()
+                        print(f"  Logits (first 2): {logits_np}")
                         print(f"  Targets (first 2): {target[:2].detach().cpu().numpy()}")
                         print(f"  CE/LDL Loss: {classification_loss.item():.6f}")
                         if hasattr(self.model, 'args') and hasattr(self.model.args, 'temperature'):

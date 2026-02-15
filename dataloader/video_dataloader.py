@@ -104,8 +104,9 @@ class VideoDataset(data.Dataset):
     def _face_detect(self,img,box,margin,mode = 'face'):
         if box is None:
             if mode == 'face':
-                # Return a black image of the same size if face is not detected
-                return Image.new('RGB', img.size, (0, 0, 0))
+                # FALLBACK: Return original image instead of black image if no face detected
+                # This helps prevent information loss in Test set
+                return img
             return img
         else:
             left, upper, right, lower = box
@@ -274,7 +275,9 @@ class VideoDataset(data.Dataset):
                     pass
 
                 # 4. Face Detection (Crop)
-                # Set margin to 10 (Balanced Crop)
+                # Reduce margin to 10 (Tight Crop) to zoom in on micro-expressions (eyebrows/eyes)
+                # This helps separate Neutral vs Confusion
+                # IMPORTANT FIX: Return full image if no box found (Fallback)
                 img_pil_face = self._face_detect(img_pil, box, margin=10, mode='face')
 
                 # 5. Body Crop (Optional)

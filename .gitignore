@@ -17,6 +17,10 @@ debug_samples/
 __pycache__/
 *.pyc
 .DS_Store
+*.pth
+*.log
+analysis_report.txt
+update_log.md
 
 # Temporary Scripts
 run_daisee.sh

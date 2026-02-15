@@ -1,33 +1,32 @@
 #!/bin/bash
 
 # =================================================================
-# VALIDATION SCRIPT FOR SFER
+# VALIDATION SCRIPT FOR CK+ (NO MOCO)
 # =================================================================
 
 # Define Data Directories
-ROOT_DATA_DIR="./Student_FER_Dataset"
+ROOT_DATA_DIR="./dataset/CKPlus_Dataset"
 ANNOT_DIR="$ROOT_DATA_DIR/annotations"
 
 # Default checkpoint path (Update this after training!)
-# This is a placeholder; user should provide the path or update it.
-DEFAULT_CHECKPOINT="outputs/Train-SFER-Stable-[02-10]-[11:46]/model_best.pth"
+DEFAULT_CHECKPOINT="outputs/Train-CKPlus-Flat-[02-10]-[08:44]/model_best.pth"
 
 CHECKPOINT="${1:-$DEFAULT_CHECKPOINT}"
 
 if [ ! -f "$CHECKPOINT" ]; then
     echo "Warning: Checkpoint file '$CHECKPOINT' not found."
-    echo "Usage: bash valid_sfer.sh path/to/model_best.pth"
+    echo "Usage: bash valid_ckplus.sh path/to/model_best.pth"
 fi
 
 echo "========================================================"
-echo "=> Starting Evaluation on SFER..."
+echo "=> Starting Evaluation on CK+..."
 echo "========================================================"
 
 python main.py \
     --mode eval \
-    --exper-name Eval-SFER \
-    --dataset SFER \
-    --gpu 0 \
+    --exper-name Eval-CKPlus \
+    --dataset CK+ \
+    --gpu mps \
     --eval-checkpoint "$CHECKPOINT" \
     --root-dir ./ \
     --train-annotation "$ANNOT_DIR/train.txt" \
@@ -48,3 +47,4 @@ python main.py \
     --seed 42 \
     --temperature 0.07 \
     --crop-body
+# Note: --use-moco removed to match training configuration
