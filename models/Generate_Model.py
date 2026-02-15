@@ -171,20 +171,31 @@ class GenerateModel(nn.Module):
         # Concatenate the two parts
         video_features = torch.cat((video_face_features, video_body_features), dim=-1)
         video_features = self.project_fc(video_features)
-        video_features = video_features / video_features.norm(dim=-1, keepdim=True)
+        # Robust normalization to avoid NaN on MPS
+        video_features = video_features / (video_features.norm(dim=-1, keepdim=True) + 1e-6)
 
         ################# Text Part ###################
         # Learnable prompts
         prompts = self.prompt_learner()
         tokenized_prompts = self.tokenized_prompts
-        text_features = self.text_encoder(prompts, tokenized_prompts)
-        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        
+        # FORCE FP32 for Text Encoder to avoid NaN on MPS
+        with torch.cuda.amp.autocast(enabled=False):
+            # Text Encoder might contain layers incompatible with AMP on MPS or just unstable
+            text_features = self.text_encoder(prompts, tokenized_prompts)
+            # Robust normalization
+            text_features = text_features.float() # Ensure float32
+            text_features = text_features / (text_features.norm(dim=-1, keepdim=True) + 1e-6)
 
         # Hand-crafted prompts (for MI Loss, not used for classification)
         hand_crafted_prompts = self.hand_crafted_prompt_embeddings
         tokenized_hand_crafted_prompts = self.tokenized_hand_crafted_prompts.to(hand_crafted_prompts.device)
-        hand_crafted_text_features = self.text_encoder(hand_crafted_prompts, tokenized_hand_crafted_prompts)
-        hand_crafted_text_features = hand_crafted_text_features / hand_crafted_text_features.norm(dim=-1, keepdim=True)
+        
+        with torch.cuda.amp.autocast(enabled=False):
+            hand_crafted_text_features = self.text_encoder(hand_crafted_prompts, tokenized_hand_crafted_prompts)
+            hand_crafted_text_features = hand_crafted_text_features.float()
+            # Robust normalization
+            hand_crafted_text_features = hand_crafted_text_features / (hand_crafted_text_features.norm(dim=-1, keepdim=True) + 1e-6)
 
         ################# MoCo Updates ###################
         moco_logits = None
@@ -210,8 +221,8 @@ class GenerateModel(nn.Module):
         if self.is_ensemble:
             # Reshape text features for ensembling: (C*P, D) -> (C, P, D)
             text_features = text_features.view(self.num_classes, self.num_prompts_per_class, -1)
-            # Normalize again just in case (optional but safe)
-            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+            # Normalize again just in case (optional but safe) - Robust version
+            text_features = text_features / (text_features.norm(dim=-1, keepdim=True) + 1e-6)
             
             # Compute logits per prompt: (B, D) @ (D, P, C) -> (B, P, C)
             # Note: We use einsum for clarity with batch and ensemble dimensions

@@ -11,8 +11,9 @@ class DCLoss(nn.Module):
         super(DCLoss, self).__init__()
 
     def forward(self, text_features):
-        # Normalize features
-        text_features = F.normalize(text_features, p=2, dim=-1)
+        # Normalize features - Robust
+        norm = text_features.norm(p=2, dim=-1, keepdim=True) + 1e-6
+        text_features = text_features / norm
         
         # Calculate cosine similarity matrix
         similarity_matrix = torch.matmul(text_features, text_features.T)
@@ -29,9 +30,12 @@ class MILoss(nn.Module):
         self.criterion = nn.CrossEntropyLoss()
 
     def forward(self, learnable_text_features, hand_crafted_text_features):
-        # Normalize features
-        learnable_text_features = F.normalize(learnable_text_features, p=2, dim=-1)
-        hand_crafted_text_features = F.normalize(hand_crafted_text_features, p=2, dim=-1)
+        # Normalize features - Robust
+        norm_learn = learnable_text_features.norm(p=2, dim=-1, keepdim=True) + 1e-6
+        learnable_text_features = learnable_text_features / norm_learn
+        
+        norm_hand = hand_crafted_text_features.norm(p=2, dim=-1, keepdim=True) + 1e-6
+        hand_crafted_text_features = hand_crafted_text_features / norm_hand
         
         # Calculate cosine similarity
         logits = torch.matmul(learnable_text_features, hand_crafted_text_features.T) / self.T
@@ -122,12 +126,12 @@ class MoCoRankLoss(nn.Module):
         return loss
 
 class LDAMLoss(nn.Module):
-    def __init__(self, cls_num_list, max_m=0.5, weight=None, s=30):
+    def __init__(self, cls_num_list, max_m=0.8, weight=None, s=30):
         super(LDAMLoss, self).__init__()
         m_list = 1.0 / np.sqrt(np.sqrt(cls_num_list))
         m_list = m_list * (max_m / np.max(m_list))
-        m_list = torch.FloatTensor(m_list).to('cuda' if torch.cuda.is_available() else 'cpu')
-        self.m_list = m_list
+        # Keep m_list as a CPU tensor initially, move to device in forward
+        self.register_buffer('m_list', torch.FloatTensor(m_list)) 
         self.s = s
         self.weight = weight
 
@@ -136,7 +140,11 @@ class LDAMLoss(nn.Module):
         index.scatter_(1, target.data.view(-1, 1), 1)
         
         index_float = index.type(torch.FloatTensor).to(x.device)
-        batch_m = torch.matmul(self.m_list[None, :], index_float.transpose(0, 1))
+        
+        # Ensure m_list is on the same device as input x
+        m_list = self.m_list.to(x.device)
+        
+        batch_m = torch.matmul(m_list[None, :], index_float.transpose(0, 1))
         batch_m = batch_m.view((-1, 1))
         x_m = x - batch_m
     
@@ -157,8 +165,10 @@ class SemanticLDLLoss(nn.Module):
         text_features: (C, D) - Embeddings of class prompts
         """
         # 1. Compute Semantic Similarity between classes based on Text Features
-        # Ensure features are normalized for cosine similarity
-        text_features = F.normalize(text_features, p=2, dim=-1)
+        # Ensure features are normalized for cosine similarity - Robust
+        norm_text = text_features.norm(p=2, dim=-1, keepdim=True) + 1e-6
+        text_features = text_features / norm_text
+        
         sim_matrix = torch.matmul(text_features, text_features.T) # (C, C)
         
         # 2. Create Soft Target Distributions

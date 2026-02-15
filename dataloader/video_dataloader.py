@@ -204,145 +204,123 @@ class VideoDataset(data.Dataset):
         for seg_ind in indices:
             p = int(seg_ind)
             for i in range(self.duration):
-                # Initialize variables to avoid UnboundLocalError
-                parent_dir = ""
-                video_key = ""
-                frame_key = ""
+                img_pil = None
                 box = None
-                img_pil = None # Ensure img_pil is initialized
-
+                
+                # 1. Read Image
                 if is_video_file:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, p)
                     ret, frame = cap.read()
                     if ret:
-                        # cv2 reads in BGR, convert to RGB for PIL
-                        img_cv = frame # Keep BGR for _face_detect or convert? 
-                        # _face_detect uses PIL. Let's convert to PIL.
-                        img_cv_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
+                        img_cv_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                         img_pil = Image.fromarray(img_cv_rgb)
-                        
-                        # CAER specific BBox Lookup Logic
-                        # Path in record: ./CAER/train/Anger/0001.avi
-                        # Key in JSON: CAER/train/Anger/0001
-                        # Subkey in JSON: 0.jpg (frame index)
-                        
-                        # Mock path for box lookup (parent dir and filename)
-                        # For video file, parent is dir, filename is video name + frame index?
-                        # This bbox logic might need adjustment for video files if you have frame-level boxes.
-                        # For now, let's assume we use the video path or parent dir for box lookup key.
-                        parent_dir = os.path.dirname(record.path)
-                        file_name = os.path.basename(record.path) # Use video filename
-
-                        # Remove './' if present
-                        rel_path = record.path.replace('./', '')
-                        # Remove extension
-                        video_key = os.path.splitext(rel_path)[0]
-                        
-                        # Robust key lookup: 
-                        # If the full path key isn't found, try stripping top-level directories
-                        # e.g., 'dataset/RAER/images/...' -> 'RAER/images/...'
-                        if video_key not in self.boxs:
-                            parts = video_key.split(os.sep)
-                            # Try progressively shorter suffixes
-                            for i in range(1, len(parts)):
-                                sub_key = '/'.join(parts[i:]) # JSON keys usually use forward slashes
-                                if sub_key in self.boxs:
-                                    video_key = sub_key
-                                    break
-                        
-                        frame_key = f"{p}.jpg" # CAER uses 0.jpg, 1.jpg... based on frame index
-                        
-                        # Debug warning if face box still not found
-                        if video_key not in self.boxs and i == 0: # Print once per clip
-                             # print(f"Warning: Video key '{video_key}' (derived from '{record.path}') not found in face bounding boxes.")
-                             pass # Suppress for now to avoid spam, but logic above should fix it.
                     else:
                         # Failed to read frame, use black image
                         img_pil = Image.new('RGB', (self.image_size, self.image_size))
-                        # parent_dir is "" (initialized above)
                 else:
                     img_path = video_frames_path[p]
-                    parent_dir = os.path.dirname(img_path)
-                    file_name = os.path.basename(img_path)
                     try:
-                        img_pil = Image.open(img_path)
+                        img_pil = Image.open(img_path).convert('RGB')
                     except:
                         img_pil = Image.new('RGB', (self.image_size, self.image_size))
-                    
-                    # Logic for frame folders if needed...
-                    # For now assume generic lookup works or implement similar key logic if frame folders follow CAER structure
-                    
+
+                # 2. Key Lookup Strategy for Bounding Box
+                # Construct possible keys to look up in the JSON
+                # Priority 1: Full relative path from dataset root (e.g., 'RAER/train/Neutral/001')
+                # Priority 2: Parent dir + Filename (e.g., 'Neutral/001')
                 
-                # Try CAER lookup style first
-                if video_key and video_key in self.boxs:
-                    if frame_key in self.boxs[video_key]:
-                        box = self.boxs[video_key][frame_key]
+                # Normalize path separators to forward slash
+                rel_path = record.path.replace('./', '').replace('\\', '/')
+                # Remove extension
+                video_key_full = os.path.splitext(rel_path)[0]
                 
-                # Fallback to generic lookup if not found (parent dir -> filename)
-                if box is None and parent_dir:
-                    if parent_dir in self.boxs:
-                         if file_name in self.boxs[parent_dir]:
-                             box = self.boxs[parent_dir][file_name]
+                frame_key = f"{p}.jpg" # Standard frame key format
+                
+                # Try finding the video key in boxes
+                matched_video_key = None
+                
+                # Strategy A: Exact match
+                if video_key_full in self.boxs:
+                    matched_video_key = video_key_full
+                
+                # Strategy B: Suffix match (handle 'dataset/' prefix issues)
+                if matched_video_key is None:
+                    parts = video_key_full.split('/')
+                    for idx in range(1, len(parts)):
+                        sub_key = '/'.join(parts[idx:])
+                        if sub_key in self.boxs:
+                            matched_video_key = sub_key
+                            break
+                
+                # 3. Retrieve Box
+                if matched_video_key and frame_key in self.boxs[matched_video_key]:
+                    box = self.boxs[matched_video_key][frame_key]
+                
+                # Debug logging for missing boxes (only once per video to avoid spam)
+                if box is None and i == 0 and p == indices[0]: 
+                    # Only log if it's the first frame of the first segment
+                    # print(f"[DEBUG] Missing Box: Video='{video_key_full}', Frame='{frame_key}'. MatchedKey='{matched_video_key}'")
+                    pass
 
-                # Perform face detection / cropping
-                if img_pil is None: # Safety check
-                     img_pil = Image.new('RGB', (self.image_size, self.image_size))
-                     
-                img_pil_face = self._face_detect(img_pil, box, margin=20, mode='face')
+                # 4. Face Detection (Crop)
+                # Set margin to 10 (Balanced Crop)
+                img_pil_face = self._face_detect(img_pil, box, margin=10, mode='face')
 
-                # Debugging: Save sample images
-                current_label = record.label - 1
-                if self.mode == 'train' and self._saved_samples.get(current_label, 0) < 5:
-                    sample_path = os.path.join(self.debug_samples_path, f'class_{current_label}')
-                    os.makedirs(sample_path, exist_ok=True)
-                    # Unique name
-                    base_name = os.path.basename(record.path)
-                    img_name = f'sample_{self._saved_samples[current_label]}_{base_name}_{p}.jpg'
-                    img_pil_face.save(os.path.join(sample_path, img_name))
-                    self._saved_samples[current_label] += 1
-
+                # 5. Body Crop (Optional)
+                img_pil_body = img_pil # Default to full image
                 if self.crop_body:
                     body_box = None
-                    # Try CAER lookup style first
-                    if video_key and video_key in self.body_boxes:
-                        if frame_key in self.body_boxes[video_key]:
-                            body_box = self.body_boxes[video_key][frame_key]
+                    if matched_video_key and matched_video_key in self.body_boxes:
+                        if frame_key in self.body_boxes[matched_video_key]:
+                            body_box = self.body_boxes[matched_video_key][frame_key]
                     
-                    # Fallback to generic lookup if not found
-                    if body_box is None and parent_dir:
-                        body_box_path = parent_dir
-                        if body_box_path in self.body_boxes:
-                            body_box = self.body_boxes[body_box_path]
-
                     if body_box is not None:
                         left, upper, right, lower = body_box
-                        img_pil_body = img_pil.crop((left, upper, right, lower))
-                    else:
-                        img_pil_body = img_pil
-                else:
-                    img_pil_body = img_pil # Use full frame if not cropping body
+                        # Ensure coordinates are within image bounds
+                        left = max(0, left); upper = max(0, upper)
+                        right = min(img_pil.width, right); lower = min(img_pil.height, lower)
+                        if right > left and lower > upper:
+                            img_pil_body = img_pil.crop((left, upper, right, lower))
 
+                # 6. Resize and Stack
+                # Resize Body
                 img_cv_body = self._pil2cv(img_pil_body)
-                img_cv_body, r = self._resize_image(img_cv_body, self.image_size, self.image_size)
+                img_cv_body, _ = self._resize_image(img_cv_body, self.image_size, self.image_size)
                 img_pil_body = self._cv2pil(img_cv_body)
-                seg_imgs = [img_pil_body]
                 
-                seg_imgs_face = [img_pil_face]
-
-                images.extend(seg_imgs)
-                images_face.extend(seg_imgs_face)
+                # Resize Face (face_detect returns cropped image, we need to resize it too?)
+                # Wait, _face_detect returns cropped image but doesn't resize it to self.image_size?
+                # The original code didn't resize face explicitly here, but transform does GroupResize.
+                # However, for consistency, let's trust the transform pipeline which includes GroupResize.
+                # But wait, `img_pil_face` might be tiny.
+                
+                images.append(img_pil_body)
+                images_face.append(img_pil_face)
+                
                 if p < num_real_frames - 1:
                     p += 1
         
         if is_video_file:
             cap.release()
 
-        images = self.transform(images)
-        images = torch.reshape(images, (-1, 3, self.image_size, self.image_size))
+        # Transforms take a list of PIL images
+        # images_face: List[PIL.Image]
+        # images: List[PIL.Image]
+        
+        # Apply transforms
+        # Note: self.transform usually expects a list and returns a Tensor of shape (T*C, H, W)
+        # ToTorchFormatTensor returns (C*T, H, W) because Stack concatenates on axis 2.
+        
+        process_data = self.transform(images) # (C*T, H, W)
+        process_data_face = self.transform(images_face) # (C*T, H, W)
 
-        images_face = self.transform(images_face)
-        images_face = torch.reshape(images_face, (-1, 3, self.image_size, self.image_size))
-        return images_face,images,record.label-1
+        # Reshape to (T, C, H, W)
+        # Since Stack concatenated [img1, img2, ...] -> [R1,G1,B1, R2,G2,B2, ...]
+        # Reshaping to (-1, 3, H, W) correctly separates frames.
+        process_data = process_data.view(-1, 3, self.image_size, self.image_size)
+        process_data_face = process_data_face.view(-1, 3, self.image_size, self.image_size)
+        
+        return process_data_face, process_data, record.label - 1
 
     def __len__(self):
         return len(self.video_list)
@@ -356,6 +334,10 @@ def train_data_loader(root_dir, list_file, num_segments, duration, image_size,da
         
     if dataset_name == "RAER" or dataset_name == "CAER":
          train_transforms = torchvision.transforms.Compose([
+            torchvision.transforms.RandomApply([
+                torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.2)
+            ], p=0.8),
+            torchvision.transforms.RandomGrayscale(p=0.2), # Ép model học hình khối (structural features)
             RandomRotation(4),
             GroupResize(image_size),
             GroupRandomHorizontalFlip(),

@@ -1,16 +1,13 @@
 set -e
 export OMP_NUM_THREADS=4
 
-# Set up the High Performance Experiment for RAER
-# Features: MoCoRank + Prompt Ensembling + Adapters + LDAM Loss (Robust Imbalance Handling)
-exper_name="RAER-HighPerf-MoCo-LDAM"
+# Set up the ULTIMATE High Performance Experiment for RAER
+# Focus: HARDCORE LDAM to fix Confusion class + Temporal 3 Layers
+# Upgrades: Deeper Model, Extreme Margin, MoCo, FP32
+exper_name="RAER-Ultimate-LDAM-Hardcore-T3"
 dataset="RAER"
 
 # --- Training Parameters ---
-# Loss Function: 
-# Using LDAM Loss. It creates larger margins for minority classes.
-# Combined with WeightedRandomSampler, this is a strong strategy.
-# Disabled LDL (Unsafe). Disabled Label Smoothing (LDAM serves a similar purpose but better for imbalance).
 use_ldl="False" 
 ldl_temperature=1.0
 ldl_warmup=2 
@@ -23,7 +20,7 @@ moco_t=0.07
 
 # Optimization
 batch_size=8
-epochs=30
+epochs=40 
 lr=0.0001
 lr_image_encoder=1e-06
 lr_prompt_learner=0.001
@@ -38,27 +35,27 @@ test_annotation="./dataset/RAER/annotation/test.txt"
 bounding_box_face="./dataset/RAER/bounding_box/face.json"
 bounding_box_body="./dataset/RAER/bounding_box/body.json"
 
-echo "Starting High Performance Training: ${exper_name}"
-echo "Features: Loss=LDAM, MoCo=${use_moco}, Queue=${moco_k}, Improved Prompts"
+echo "Starting ULTIMATE Training: ${exper_name}"
+echo "Upgrades: Temporal Layers=3, LDAM Margin=0.8, MoCo=Enabled, AMP=DISABLED"
 
+# Note: Removed --use-amp to force FP32
 python main.py \
     --mode train \
-    --exper-name ${exper_name} \
-    --dataset ${dataset} \
+    --exper-name "${exper_name}" \
+    --dataset "${dataset}" \
     --gpu 0 \
     --workers 4 \
     --seed 42 \
-    --root-dir ${root_dir} \
-    --train-annotation ${train_annotation} \
-    --val-annotation ${val_annotation} \
-    --test-annotation ${test_annotation} \
+    --root-dir "${root_dir}" \
+    --train-annotation "${train_annotation}" \
+    --val-annotation "${val_annotation}" \
+    --test-annotation "${test_annotation}" \
     --clip-path ViT-B/16 \
-    --bounding-box-face ${bounding_box_face} \
-    --bounding-box-body ${bounding_box_body} \
+    --bounding-box-face "${bounding_box_face}" \
+    --bounding-box-body "${bounding_box_body}" \
     --epochs ${epochs} \
     --batch-size ${batch_size} \
     --print-freq 50 \
-    --use-amp \
     --optimizer AdamW \
     --lr ${lr} \
     --lr-image-encoder ${lr_image_encoder} \
@@ -66,15 +63,17 @@ python main.py \
     --lr-adapter ${lr_adapter} \
     --weight-decay ${weight_decay} \
     --momentum 0.9 \
-    --milestones 15 25 \
+    --milestones 20 30 \
     --gamma 0.1 \
     --loss-type ldam \
+    --ldam-max-m 0.8 \
+    --ldam-s 30.0 \
     --lambda_mi 0.05 \
     --lambda_dc 0.05 \
     --use-weighted-sampler \
-    --mixup-alpha 0.2 \
+    --mixup-alpha 0.0 \
     --text-type prompt_ensemble \
-    --temporal-layers 1 \
+    --temporal-layers 3 \
     --contexts-number 8 \
     --class-token-position end \
     --class-specific-contexts True \

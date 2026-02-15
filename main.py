@@ -99,6 +99,9 @@ loss_group.add_argument('--use-ldl', action='store_true', help='Use Semantic Lab
 loss_group.add_argument('--ldl-temperature', type=float, default=1.0, help='Temperature for LDL target distribution.')
 loss_group.add_argument('--ldl-warmup', type=int, default=5, help='Warmup epochs for LDL loss (during warmup, use CE).')
 loss_group.add_argument('--mixup-alpha', type=float, default=0.2, help='Alpha value for Mixup data augmentation. Set to 0.0 to disable.')
+# NEW LDAM ARGS
+loss_group.add_argument('--ldam-max-m', type=float, default=0.5, help='Max margin for LDAM Loss.')
+loss_group.add_argument('--ldam-s', type=float, default=30.0, help='Scaling factor for LDAM Loss.')
 
 # --- Model & Input ---
 model_group = parser.add_argument_group('Model & Input', 'Parameters for model architecture and data handling')
@@ -225,8 +228,8 @@ def run_training(args: argparse.Namespace) -> None:
         criterion = SemanticLDLLoss(temperature=args.ldl_temperature).to(args.device)
     elif args.loss_type == 'ldam':
         if sum(cls_num_list) > 0:
-            print(f"=> Using LDAM Loss with s=30, max_m=0.5")
-            criterion = LDAMLoss(cls_num_list=cls_num_list, max_m=0.5, s=30).to(args.device)
+            print(f"=> Using LDAM Loss with s={args.ldam_s}, max_m={args.ldam_max_m}")
+            criterion = LDAMLoss(cls_num_list=cls_num_list, max_m=args.ldam_max_m, s=args.ldam_s).to(args.device)
         else:
             print("=> Error: cls_num_list is empty/zero. Cannot use LDAM. Falling back to CrossEntropy.")
             criterion = nn.CrossEntropyLoss().to(args.device)
@@ -262,11 +265,20 @@ def run_training(args: argparse.Namespace) -> None:
     if args.resume:
         if os.path.isfile(args.resume):
             print(f"=> Loading checkpoint '{args.resume}'")
-            checkpoint = torch.load(args.resume, map_location=args.device)
+            checkpoint = torch.load(args.resume, map_location=args.device, weights_only=False)
             start_epoch = checkpoint['epoch']
             best_val_uar = checkpoint.get('best_acc', 0.0)
-            model.load_state_dict(checkpoint['state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
+            
+            # Use strict=False to allow loading older checkpoints into the new model (e.g., when adding MoCo)
+            msg = model.load_state_dict(checkpoint['state_dict'], strict=False)
+            print(f"=> Load result: {msg}")
+            
+            if 'optimizer' in checkpoint and not args.use_moco: # Skip optimizer resume if architecture changed significantly
+                try:
+                    optimizer.load_state_dict(checkpoint['optimizer'])
+                except:
+                    print("=> Warning: Could not resume optimizer state.")
+            
             if 'recorder' in checkpoint:
                 recorder = checkpoint['recorder']
             print(f"=> Loaded checkpoint '{args.resume}' (epoch {start_epoch})")
