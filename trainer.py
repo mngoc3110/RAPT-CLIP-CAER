@@ -67,7 +67,7 @@ class Trainer:
         # Save the image
         torchvision.utils.save_image(tensor, filepath)
 
-    def mixup_data(self, x1, x2, alpha=1.0):
+    def mixup_data(self, x1, x2, y, alpha=1.0):
         '''Returns mixed inputs, pairs of targets, and lambda'''
         if alpha > 0:
             lam = np.random.beta(alpha, alpha)
@@ -79,7 +79,7 @@ class Trainer:
 
         mixed_x1 = lam * x1 + (1 - lam) * x1[index, :]
         mixed_x2 = lam * x2 + (1 - lam) * x2[index, :]
-        return mixed_x1, mixed_x2, index, lam
+        return mixed_x1, mixed_x2, y[index], lam
 
     def _run_one_epoch(self, loader, epoch_str, is_train=True):
         """Runs one epoch of training or validation."""
