@@ -89,6 +89,12 @@ class CAERSDataset(data.Dataset):
                     
                     full_path = os.path.join(self.root_dir, rel_path)
                     samples.append((full_path, label, rel_path)) # Store rel_path for bbox lookup
+                elif len(parts) == 2:
+                    # Handle case where num_frames is omitted: path label
+                    rel_path = parts[0]
+                    label = int(parts[1])
+                    full_path = os.path.join(self.root_dir, rel_path)
+                    samples.append((full_path, label, rel_path))
                 else:
                      print(f"Warning: Skipping malformed line in {self.list_file}: {line.strip()}")
         
