@@ -6,52 +6,40 @@
 # Assuming annotations are uploaded/generated at: /kaggle/working/RAPT-CLIP-CAER/caer_s_annotations
 
 DATASET_ROOT="/kaggle/input/datasets/lcngtr/caer-s"
-# Adjust this path if your annotations are elsewhere (e.g. /kaggle/input/my-annotations)
 ANN_DIR="./caer_s_annotations"
 
-echo "Starting CAER-S Training on Kaggle..."
+# Placeholder for model path - CHANGE THIS to your trained model checkpoint path! 
+MODEL_PATH="outputs/CAER_S_KAGGLE/model_best.pth" 
+
+echo "Starting CAER-S Evaluation on Kaggle..."
 echo "Dataset Root: $DATASET_ROOT"
-echo "Annotations: $ANN_DIR"
+echo "Model Checkpoint: $MODEL_PATH"
+
+if [ ! -f "$MODEL_PATH" ]; then
+  echo "Error: Model checkpoint not found at $MODEL_PATH"
+  echo "Please update MODEL_PATH in this script to point to your .pth file."
+  exit 1
+fi
 
 python main.py \
-  --mode train \
-  --exper-name CAER_S_KAGGLE \
+  --mode eval \
+  --exper-name CAER_S_EVAL_KAGGLE \
   --dataset CAER-S \
   --gpu 0 \
-  --epochs 20 \
   --batch-size 32 \
-  --optimizer AdamW \
-  --lr 2e-5 \
-  --lr-image-encoder 1e-6 \
-  --lr-prompt-learner 2e-4 \
-  --lr-adapter 1e-4 \
-  --weight-decay 0.05 \
-  --temporal-layers 1 \
   --num-segments 1 \
   --duration 1 \
   --image-size 224 \
   --seed 42 \
-  --print-freq 50 \
   --root-dir "$DATASET_ROOT" \
-  --train-annotation "$ANN_DIR/train.txt" \
-  --val-annotation "$ANN_DIR/test.txt" \
   --test-annotation "$ANN_DIR/test.txt" \
   --bounding-box-face "$ANN_DIR/caer_s_faces.json" \
+  --eval-checkpoint "$MODEL_PATH" \
   --text-type prompt_ensemble \
   --contexts-number 8 \
   --class-token-position end \
   --class-specific-contexts True \
   --load_and_tune_prompt_learner True \
-  --loss-type ldam \
-  --lambda_mi 0.1 \
-  --lambda_dc 0.1 \
-  --mi-warmup 5 \
-  --mi-ramp 10 \
-  --dc-warmup 5 \
-  --dc-ramp 10 \
-  --label-smoothing 0.05 \
-  --use-amp \
-  --crop-body \
-  --grad-clip 1.0
+  --crop-body
 
-echo "Training Finished!"
+echo "Evaluation Finished!"

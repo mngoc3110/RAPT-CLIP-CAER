@@ -24,84 +24,77 @@ def parse_csv_files(root_dir, subsets, class_map):
         print(f"Error: Root directory '{root_dir}' does not exist.")
         return [], {}
 
-    # Define standard class names for mapping
+    # Standard class mapping
     classes_std = ['Anger', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
     class_name_map = {c.lower(): c for c in classes_std}
+    # Some datasets use 'Angry' instead of 'Anger'
+    class_name_map['angry'] = 'Anger'
     
     for subset in subsets:
-        subset_dir = os.path.join(root_dir, subset)
-        if not os.path.exists(subset_dir):
+        # Search for CSV files recursively starting from root_dir/subset
+        subset_root = os.path.join(root_dir, subset)
+        if not os.path.exists(subset_root):
             continue
             
-        # Find all CSV files in this subset directory (e.g., bbox_train_Angry.csv)
-        # Search recursively to catch files in subfolders
-        csv_files = glob.glob(os.path.join(subset_dir, "**", "*.csv"), recursive=True)
-
+        csv_files = glob.glob(os.path.join(subset_root, "**", "*.csv"), recursive=True)
         print(f"  Found {len(csv_files)} CSV files in {subset}...")
 
         for csv_file in csv_files:
             try:
-                # Read CSV, assuming no header or standard header
-                # Based on user description: image_name, image_path, class, bbox
-                # Let's try reading with header inference
                 df = pd.read_csv(csv_file)
-                
-                # Verify columns exist
-                required_cols = ['image_name', 'class', 'bbox']
+                required_cols = ['image_name', 'class', 'bbox', 'image_path']
                 if not all(col in df.columns for col in required_cols):
-                    print(f"    Warning: Missing columns in {csv_file}. Expected {required_cols}. Found {df.columns}. Skipping.")
-                    continue
+                    # Try without image_path
+                    if not all(col in df.columns for col in ['image_name', 'class', 'bbox']):
+                        print(f"    Warning: Missing columns in {csv_file}. Skipping.")
+                        continue
                 
                 for _, row in df.iterrows():
                     img_name = str(row['image_name']).strip()
-                    class_name = str(row['class']).strip()
+                    raw_class_name = str(row['class']).strip()
                     bbox_str = str(row['bbox']).strip()
                     
                     # Normalize class name
-                    # CSV class might be 'Angry', directory might be 'Angry'
-                    # Map to standard class name (Anger, Disgust, etc.)
-                    # Note: CAER usually uses 'Anger' but some CSVs might use 'Angry'.
-                    # Let's map 'Angry' -> 'Anger' if needed.
-                    if class_name.lower() == 'angry':
-                        class_name = 'Anger'
-                    elif class_name.lower() in class_name_map:
-                         class_name = class_name_map[class_name.lower()]
-                    
+                    class_name = class_name_map.get(raw_class_name.lower(), raw_class_name)
                     if class_name not in class_map:
-                        continue # Skip unknown class
+                        continue 
 
                     label_idx = class_map[class_name]
                     
-                    # Construct relative path
-                    # Structure: subset/class_name/image_name
-                    # Example: train/Angry/6017.png
-                    # Note: Use the normalized class_name for folder structure?
-                    # Or use the class name from CSV? Usually folder matches class.
-                    # Let's assume folder structure follows Standard Class Names (Anger, Disgust...)
-                    rel_path = os.path.join(subset, class_name, img_name)
+                    # Try to find the image relative to root_dir
+                    # 1. Using image_path from CSV (most reliable for nested structures)
+                    rel_path = None
+                    if 'image_path' in row:
+                        path_str = str(row['image_path']).replace("\\", "/")
+                        # Example: /content/drive/MyDrive/.../CAER-S/train/Angry/6017.png
+                        # We want the part that starts from train/ or valid/ or test/
+                        parts = path_str.split('/')
+                        for i, p in enumerate(parts):
+                            if p in ['train', 'valid', 'test']:
+                                rel_path = "/".join(parts[i:])
+                                break
                     
-                    # Check if file exists using standard class name folder
+                    # 2. Fallback construction
+                    if not rel_path:
+                        rel_path = os.path.join(subset, raw_class_name, img_name)
+                    
+                    # Verify existence
                     full_path = os.path.join(root_dir, rel_path)
                     if not os.path.exists(full_path):
-                        # Try the raw class name from CSV (e.g. 'Angry' folder?)
-                        rel_path_alt = os.path.join(subset, row['class'].strip(), img_name)
-                        full_path_alt = os.path.join(root_dir, rel_path_alt)
-                        if os.path.exists(full_path_alt):
+                        # Try nested folder: subset/subset/raw_class_name/img_name
+                        rel_path_alt = os.path.join(subset, subset, raw_class_name, img_name)
+                        if os.path.exists(os.path.join(root_dir, rel_path_alt)):
                             rel_path = rel_path_alt
                         else:
-                            # print(f"    Warning: Image {rel_path} (and {rel_path_alt}) not found. Skipping.")
                             continue
 
                     # Parse Bounding Box
                     try:
-                        # bbox is string "[x, y, w, h]" or "[x1, y1, x2, y2]"?
-                        # User example: [227, 20, 548, 396] for 6017.png
-                        # Usually this is [x1, y1, x2, y2]
                         bbox = ast.literal_eval(bbox_str)
                         if isinstance(bbox, list) and len(bbox) == 4:
                             bboxes[rel_path] = bbox
                     except:
-                        print(f"    Warning: Could not parse bbox '{bbox_str}' for {rel_path}")
+                        pass
 
                     # Add to annotations: path num_frames label
                     annotations.append(f"{rel_path} 1 {label_idx}")
