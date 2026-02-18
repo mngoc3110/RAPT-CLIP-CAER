@@ -1,0 +1,22 @@
+1. Analyze CAER-S Dataset:
+   - Target Dataset: CAER-S (Static images extracted from CAER video dataset).
+   - Structure Expectation: Root -> Train/Test -> Class Folders (Anger, Disgust, Fear, Happy, Neutral, Sad, Surprise) -> Images.
+   - Reference: https://arxiv.org/pdf/1908.05913
+
+2. Set SOTA Goals:
+   - Target Accuracy: >77%, aiming for 80%.
+   - Primary Metric: Accuracy (WAR) instead of UAR.
+
+3. Implementation Plan:
+   - [x] Create `check_dataset_structure.py` to verify image counts.
+   - [ ] Update `main.py` to save best model based on WAR (Accuracy).
+   - [ ] Implement `dataloader/caer_s_dataloader.py` for static images.
+     - Needs to handle T=1 dimension for the model.
+     - Needs to generate 'face' and 'body' inputs (using full image for both if no crop provided).
+   - [ ] Update `train_sh/train_caer_s.sh` script.
+   - [ ] Run `check_dataset_structure.py` (User needs to provide path).
+
+4. Current Status:
+   - Codebase analyzed.
+   - Plan documented.
+   - Dataset check script created.

@@ -305,42 +305,41 @@ class_descriptor_caer = [
 
 prompt_ensemble_caer = [
     [ # Anger
-        "A photo of a person showing anger.",
-        "A face with furrowed brows and a glare.",
-        "An angry facial expression."
+        "A scene from a movie showing a person in an angry confrontation.",
+        "A person with an angry face in a tense and hostile environment.",
+        "A photo of an actor expressing rage during a dramatic cinematic scene."
     ],
     [ # Disgust
-        "A photo of a person showing disgust.",
-        "A face with a wrinkled nose.",
-        "A disgusted facial expression."
+        "A person showing a disgusted expression in a repulsive or unpleasant situation.",
+        "A movie scene where someone reacts with revulsion to something gross.",
+        "A cinematic shot of a face showing strong dislike and disgust."
     ],
     [ # Fear
-        "A photo of a person showing fear.",
-        "A face with wide eyes and a terrified look.",
-        "A fearful facial expression."
+        "A person showing fear in a dark, mysterious, or threatening environment.",
+        "A scene from a suspenseful movie where an actor looks absolutely terrified.",
+        "A cinematic photo of a fearful face during a scary and tense moment."
     ],
     [ # Happy
-        "A photo of a person showing happiness.",
-        "A smiling face with joy.",
-        "A happy facial expression."
+        "A person feeling happy and celebrating in a bright, social movie scene.",
+        "A joyful actor in a pleasant environment showing a wide smile.",
+        "A scene showing a happy facial expression during a positive and cheerful event."
     ],
     [ # Neutral
-        "A photo of a person showing a neutral expression.",
-        "A calm face with no strong emotion.",
-        "A neutral facial expression."
+        "A person with a neutral expression in a mundane, everyday cinematic scene.",
+        "A calm and expressionless actor in a casual movie background.",
+        "A photo of someone showing no specific emotion in a normal setting."
     ],
     [ # Sad
-        "A photo of a person showing sadness.",
-        "A face with a frown and sorrowful eyes.",
-        "A sad facial expression."
+        "A person showing sadness and grief in a gloomy or lonely cinematic environment.",
+        "A scene from a dramatic movie where an actor looks heartbroken and sorrowful.",
+        "A cinematic photo of a sad face in a somber, quiet, and melancholic setting."
     ],
     [ # Surprise
-        "A photo of a person showing surprise.",
-        "A face with an open mouth and wide eyes.",
-        "A surprised facial expression."
+        "A person showing great surprise at an unexpected event in a dynamic scene.",
+        "A shocked facial expression during a surprising and dramatic movie moment.",
+        "A cinematic shot of an actor looking amazed or startled by something sudden."
     ]
 ]
-
 
 class_names_daisee = ['Very Low', 'Low', 'High', 'Very High']
 
