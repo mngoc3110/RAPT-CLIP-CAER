@@ -213,6 +213,24 @@ def run_training(args: argparse.Namespace) -> None:
             label_idx = record.label - 1
             if 0 <= label_idx < len(cls_num_list):
                 cls_num_list[label_idx] += 1
+    elif hasattr(train_loader.dataset, 'samples'):
+        print(f"=> Calculating class distribution from samples (CAER-S)...")
+        # CAERSDataset stores (path, label, rel_path) in samples
+        for _, label, _ in train_loader.dataset.samples:
+            # CAERSDataset.__getitem__ returns label (if 0-based) or label-1 (if 1-based).
+            # We updated CAERSDataset to assume 0-based file labels, so __getitem__ returns label directly.
+            # Thus, we should use 'label' directly here as well, assuming it matches what __getitem__ returns.
+            # But wait, __getitem__ returns 'label_idx'.
+            # If the file has 0-based labels, 'label' in samples is 0-based.
+            label_idx = int(label)
+            if 0 <= label_idx < len(cls_num_list):
+                cls_num_list[label_idx] += 1
+            else:
+                # Fallback if label is 1-based in file but mapped to 0-based in getitem
+                # This branch handles the case where label might be 1..7
+                label_idx_alt = label_idx - 1
+                if 0 <= label_idx_alt < len(cls_num_list):
+                    cls_num_list[label_idx_alt] += 1
     else:
         # Fallback or warning if dataset structure is different
         print("=> Warning: Could not calculate class distribution directly from dataset. Using uniform distribution placeholder if needed.")

@@ -166,8 +166,8 @@ class CAERSDataset(data.Dataset):
         t_body = t_body.unsqueeze(0)
         t_face = t_face.unsqueeze(0)
         
-        # Label is 1-based in file, convert to 0-based
-        label_idx = label - 1
+        # Label is assumed to be 0-based in the file (0..6)
+        label_idx = label
         
         return t_face, t_body, label_idx
 
