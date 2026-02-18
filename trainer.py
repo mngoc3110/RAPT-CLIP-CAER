@@ -140,7 +140,7 @@ class Trainer:
                 
                 # Apply Mixup
                 if is_train and self.mixup_alpha > 0:
-                    images_face, images_body, target_b, lam = self.mixup_data(images_face, images_body, self.mixup_alpha)
+                    images_face, images_body, target_b, lam = self.mixup_data(images_face, images_body, target, self.mixup_alpha)
 
                 with torch.cuda.amp.autocast(enabled=self.use_amp):
                     # Forward pass
