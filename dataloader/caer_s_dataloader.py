@@ -98,6 +98,25 @@ class CAERSDataset(data.Dataset):
                 else:
                      print(f"Warning: Skipping malformed line in {self.list_file}: {line.strip()}")
         
+        # Check for 1-based labels (1..7) and shift to 0..6 if necessary
+        if samples:
+            labels = [s[1] for s in samples]
+            min_label, max_label = min(labels), max(labels)
+            unique_labels = sorted(list(set(labels)))
+            print(f"Dataset Stats for {self.list_file}:")
+            print(f"  Sample count: {len(samples)}")
+            print(f"  Label range: {min_label} to {max_label}")
+            print(f"  Unique labels: {unique_labels}")
+            
+            if min_label == 1 and max_label == 7:
+                print(f"Detected 1-based labels (1..7). Shifting to 0..6.")
+                samples = [(p, l - 1, r) for p, l, r in samples]
+            elif max_label >= self.num_classes or min_label < 0:
+                print(f"Warning: Labels are out of expected range 0..{self.num_classes-1}. Remapping to 0..{len(unique_labels)-1}.")
+                mapping = {l: i for i, l in enumerate(unique_labels)}
+                samples = [(p, mapping[l], r) for p, l, r in samples]
+                print(f"  Label mapping applied: {mapping}")
+
         print(f"Loaded {len(samples)} samples from {self.list_file}")
         return samples
 
