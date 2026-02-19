@@ -206,13 +206,27 @@ def run_training(args: argparse.Namespace) -> None:
     # Check if dataset has video_list (standard VideoDataset)
     if hasattr(train_loader.dataset, 'video_list'):
         print(f"=> Calculating class distribution from video_list...")
+        
+        # Robust label detection: Check if labels are 0-based or 1-based
+        all_labels = [r.label for r in train_loader.dataset.video_list]
+        if len(all_labels) > 0:
+            min_label = min(all_labels)
+            print(f"=> Detected min label in dataset: {min_label}")
+        else:
+            min_label = 0 # Fallback
+
         for record in train_loader.dataset.video_list:
-            # Labels in RAER/CAER annotations are typically 1-based (e.g., 1..8)
-            # VideoDataset.__getitem__ returns label-1.
-            # So we map record.label (1-based) to 0-based index.
-            label_idx = record.label - 1
+            # Adjust label index based on detected min_label
+            if min_label == 0:
+                label_idx = record.label
+            else:
+                label_idx = record.label - 1
+            
             if 0 <= label_idx < len(cls_num_list):
                 cls_num_list[label_idx] += 1
+            else:
+                # Fallback check (e.g. if mixed)
+                pass
     elif hasattr(train_loader.dataset, 'samples'):
         print(f"=> Calculating class distribution from samples (CAER-S)...")
         # CAERSDataset stores (path, label, rel_path) in samples
