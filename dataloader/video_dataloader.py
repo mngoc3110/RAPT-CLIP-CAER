@@ -159,6 +159,9 @@ class VideoDataset(data.Dataset):
         right = min(img.width, right + margin)
         lower = min(img.height, lower + margin)
 
+        if right <= left or lower <= upper:
+            return img
+
         if mode == "face":
             return img.crop((left, upper, right, lower))
         elif mode == "body":
