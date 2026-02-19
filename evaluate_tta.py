@@ -149,10 +149,8 @@ def run_tta(args):
     # Save results
     with open(os.path.join(os.path.dirname(args.checkpoint), 'tta_results.txt'), 'w') as f:
         f.write(f"TTA Results (FiveCrop):\n")
-        f.write(f"WAR: {war:.2f}%
-")
-        f.write(f"UAR: {uar:.2f}%
-\n")
+        f.write(f"WAR: {war:.2f}%\n")
+        f.write(f"UAR: {uar:.2f}%\n\n")
         f.write(f"Confusion Matrix:\n{cm}\n")
 
 if __name__ == '__main__':
