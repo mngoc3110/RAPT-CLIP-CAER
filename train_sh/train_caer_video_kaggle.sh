@@ -43,6 +43,7 @@ python main.py \
   --class-specific-contexts True \
   --load_and_tune_prompt_learner True \
   --loss-type ldam \
+  --ldam-max-m 0.3 \
   --lambda_mi 0.1 \
   --lambda_dc 0.1 \
   --label-smoothing 0.05 \
