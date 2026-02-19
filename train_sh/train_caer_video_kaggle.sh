@@ -9,9 +9,21 @@
 DATASET_ROOT="/kaggle/input/caer-data/CAER"
 ANN_DIR="./caer_video_annotations"
 
+# [OPTIONAL] Resume from a checkpoint (e.g., from Epoch 5)
+# Set this to the path of your checkpoint file on Kaggle (e.g., /kaggle/working/outputs/.../model.pth)
+# Leave empty to start from scratch.
+RESUME_PATH=""
+
 echo "Starting CAER Video Training on Kaggle..."
 echo "Dataset Root: $DATASET_ROOT"
 echo "Annotations: $ANN_DIR"
+
+if [ -n "$RESUME_PATH" ]; then
+  echo "Resuming from: $RESUME_PATH"
+  RESUME_ARG="--resume $RESUME_PATH"
+else
+  RESUME_ARG=""
+fi
 
 python main.py \
   --mode train \
@@ -19,7 +31,7 @@ python main.py \
   --dataset CAER \
   --gpu 0 \
   --epochs 20 \
-  --batch-size 16 \
+  --batch-size 8 \
   --optimizer AdamW \
   --lr 2e-5 \
   --lr-image-encoder 1e-6 \
@@ -27,7 +39,7 @@ python main.py \
   --lr-adapter 1e-4 \
   --weight-decay 0.05 \
   --temporal-layers 1 \
-  --num-segments 16 \
+  --num-segments 8 \
   --duration 1 \
   --image-size 224 \
   --seed 42 \
@@ -43,11 +55,13 @@ python main.py \
   --class-specific-contexts True \
   --load_and_tune_prompt_learner True \
   --loss-type ldam \
-  --ldam-max-m 0.3 \
+  --ldam-max-m 0.5 \
+  --ldam-s 40.0 \
   --lambda_mi 0.1 \
   --lambda_dc 0.1 \
-  --label-smoothing 0.05 \
+  --label-smoothing 0.1 \
   --use-amp \
-  --grad-clip 1.0
+  --grad-clip 1.0 \
+  $RESUME_ARG
 
 echo "Training Finished!"
