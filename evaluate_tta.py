@@ -80,7 +80,7 @@ def run_tta(args):
     model.to(device)
     
     if os.path.isfile(args.checkpoint):
-        print(f="=> Loading checkpoint '{args.checkpoint}'")
+        print(f"=> Loading checkpoint '{args.checkpoint}'")
         checkpoint = torch.load(args.checkpoint, map_location=device)
         model.load_state_dict(checkpoint['state_dict'])
         print("=> Checkpoint loaded.")
