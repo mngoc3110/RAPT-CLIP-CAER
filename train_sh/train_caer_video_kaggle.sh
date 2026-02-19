@@ -48,7 +48,6 @@ python main.py \
   --lambda_dc 0.1 \
   --label-smoothing 0.05 \
   --use-amp \
-  --crop-body \
   --grad-clip 1.0
 
 echo "Training Finished!"
