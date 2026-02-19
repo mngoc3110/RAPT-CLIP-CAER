@@ -2,16 +2,20 @@
 raer/
 CAER/
 CAER-S/
+CAER_Video/
 CKPlus_Dataset/
 DAiSEE/
 Student_FER_Dataset/
 
+# Models
+RAPT-CLIP-CAER-MODEL
+
 # Annotations (generated)
 daisee_annotations/
 caer_annotations/
+caer_video_annotations/
 
 # Ignore training outputs / checkpoints / logs
-outputs/
 debug_predictions/
 debug_samples/
 __pycache__/

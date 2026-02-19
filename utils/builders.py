@@ -153,5 +153,60 @@ def build_dataloaders(args: argparse.Namespace) -> Tuple[torch.utils.data.DataLo
         print(f"Total number of training images: {len(train_data)}")
         return train_loader, val_loader, test_loader
 
+    elif args.dataset.strip() == "CAER":
+        print(f"=> Using CAER Video smart dataloader...")
+        from dataloader.video_dataloader import train_data_loader, test_data_loader
+        
+        train_loader = torch.utils.data.DataLoader(
+            train_data_loader(
+                root_dir=args.root_dir,
+                list_file=train_annotation_file_path,
+                num_segments=args.num_segments,
+                duration=args.duration,
+                image_size=args.image_size,
+                dataset_name=args.dataset,
+                bounding_box_face=args.bounding_box_face,
+                bounding_box_body=args.bounding_box_body,
+                crop_body=args.crop_body,
+                num_classes=num_classes
+            ),
+            batch_size=args.batch_size, shuffle=True,
+            num_workers=args.workers, pin_memory=True, drop_last=True
+        )
+        
+        val_loader = torch.utils.data.DataLoader(
+            test_data_loader(
+                root_dir=args.root_dir,
+                list_file=val_annotation_file_path,
+                num_segments=args.num_segments,
+                duration=args.duration,
+                image_size=args.image_size,
+                bounding_box_face=args.bounding_box_face,
+                bounding_box_body=args.bounding_box_body,
+                crop_body=args.crop_body,
+                num_classes=num_classes
+            ),
+            batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True
+        )
+        
+        test_loader = torch.utils.data.DataLoader(
+            test_data_loader(
+                root_dir=args.root_dir,
+                list_file=test_annotation_file_path,
+                num_segments=args.num_segments,
+                duration=args.duration,
+                image_size=args.image_size,
+                bounding_box_face=args.bounding_box_face,
+                bounding_box_body=args.bounding_box_body,
+                crop_body=args.crop_body,
+                num_classes=num_classes
+            ),
+            batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True
+        )
+        
+        return train_loader, val_loader, test_loader
+
     else:
-        raise NotImplementedError(f"Dataset {args.dataset} is not supported. Please use CAER-S.")
+        raise NotImplementedError(f"Dataset {args.dataset} is not supported. Please use CAER or CAER-S.")

@@ -12,7 +12,7 @@ from tqdm import tqdm
 from models.Generate_Model import GenerateModel
 from models.Text import *
 from dataloader.caer_s_dataloader import CAERSDataset
-from utils.utils import AverageMeter
+from utils.utils import AverageMeter, RecorderMeter
 from clip import clip
 
 def get_class_info(dataset_name):
@@ -81,7 +81,13 @@ def run_tta(args):
     
     if os.path.isfile(args.checkpoint):
         print(f"=> Loading checkpoint '{args.checkpoint}'")
-        checkpoint = torch.load(args.checkpoint, map_location=device)
+        try:
+            # Try loading with weights_only=False (needed for objects like RecorderMeter)
+            checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=False)
+        except TypeError:
+             # Fallback for older torch versions without weights_only arg
+            checkpoint = torch.load(args.checkpoint, map_location=device)
+            
         model.load_state_dict(checkpoint['state_dict'])
         print("=> Checkpoint loaded.")
     else:
