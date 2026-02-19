@@ -17,6 +17,7 @@ if [ ! -f "$MODEL_PATH" ]; then
   exit 1
 fi
 
+# Run evaluation
 python evaluate_tta.py \
   --dataset CAER-S \
   --root-dir "$DATASET_ROOT" \
@@ -30,6 +31,8 @@ python evaluate_tta.py \
   --contexts-number 8 \
   --class-token-position end \
   --class-specific-contexts True \
+  --load_and_tune_prompt_learner True \
+  --temperature 0.07 \
   --use-moco
 
 echo "TTA Evaluation Finished!"

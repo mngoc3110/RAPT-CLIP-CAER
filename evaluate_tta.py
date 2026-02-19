@@ -171,7 +171,12 @@ if __name__ == '__main__':
     parser.add_argument('--contexts-number', type=int, default=8)
     parser.add_argument('--class-token-position', type=str, default='end')
     parser.add_argument('--class-specific-contexts', type=str, default='True')
+    parser.add_argument('--load_and_tune_prompt_learner', type=str, default='True', choices=['True', 'False'])
+    parser.add_argument('--temperature', type=float, default=0.07)
     parser.add_argument('--use-moco', action='store_true') # Add if model was trained with MoCo
+    parser.add_argument('--moco-k', type=int, default=4096)
+    parser.add_argument('--moco-m', type=float, default=0.99)
+    parser.add_argument('--moco-t', type=float, default=0.07)
     
     args = parser.parse_args()
     run_tta(args)
