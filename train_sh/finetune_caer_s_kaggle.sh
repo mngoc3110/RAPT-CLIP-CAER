@@ -9,8 +9,7 @@ DATASET_ROOT="/kaggle/input/datasets/lcngtr/caer-s"
 ANN_DIR="./caer_s_annotations"
 
 # IMPORTANT: Point this to your BEST checkpoint from the previous training run
-# Example: /kaggle/working/RAPT-CLIP-CAER/outputs/CAER_S_KAGGLE-[DATE]/model_best.pth
-PRETRAINED_PATH="outputs/CAER_S_KAGGLE/model_best.pth"
+PRETRAINED_PATH="outputs/Ablation-RAER-FULL_fix_parameter_fullface_train_test-[02-15]-[07:38]/model_best.pth"
 
 echo "Starting CAER-S Fine-tuning on Kaggle..."
 echo "Resuming from: $PRETRAINED_PATH"
