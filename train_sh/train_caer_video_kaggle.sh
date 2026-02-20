@@ -7,7 +7,11 @@
 
 # Adjust this to where the dataset is located on Kaggle
 DATASET_ROOT="/kaggle/input/caer-data/CAER"
-ANN_DIR="./caer_video_annotations"
+# Use absolute path for annotations to avoid FileNotFoundError
+ANN_DIR="$(pwd)/caer_video_annotations"
+
+echo "Checking annotation directory: $ANN_DIR"
+ls -lh "$ANN_DIR"
 
 # [OPTIONAL] Resume from a checkpoint (e.g., from Epoch 5)
 # Set this to the path of your checkpoint file on Kaggle (e.g., /kaggle/working/outputs/.../model.pth)
