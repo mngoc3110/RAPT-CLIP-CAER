@@ -22,14 +22,15 @@ echo "Starting CAER Video Training on Kaggle..."
 echo "Dataset Root: $DATASET_ROOT"
 echo "Annotations: $ANN_DIR"
 
-if [ -n "$RESUME_PATH" ]; then
+if [ -n "$RESUME_PATH" ] && [ -f "$RESUME_PATH" ]; then
   echo "Resuming from: $RESUME_PATH"
   RESUME_ARG="--resume $RESUME_PATH"
 else
+  echo "No valid checkpoint found at $RESUME_PATH, starting from scratch."
   RESUME_ARG=""
 fi
 
-CMD="python main.py \
+python main.py \
   --mode train \
   --exper-name CAER_VIDEO_FULL \
   --dataset CAER \
@@ -48,11 +49,11 @@ CMD="python main.py \
   --image-size 224 \
   --seed 42 \
   --print-freq 50 \
-  --root-dir $DATASET_ROOT \
-  --train-annotation $ANN_DIR/train.txt \
-  --val-annotation $ANN_DIR/validation.txt \
-  --test-annotation $ANN_DIR/test.txt \
-  --bounding-box-face $ANN_DIR/caer_video_faces.json \
+  --root-dir "$DATASET_ROOT" \
+  --train-annotation "$ANN_DIR/train.txt" \
+  --val-annotation "$ANN_DIR/validation.txt" \
+  --test-annotation "$ANN_DIR/test.txt" \
+  --bounding-box-face "$ANN_DIR/caer_video_faces.json" \
   --text-type prompt_ensemble \
   --contexts-number 8 \
   --class-token-position end \
@@ -66,11 +67,6 @@ CMD="python main.py \
   --label-smoothing 0.1 \
   --use-amp \
   --grad-clip 1.0 \
-  $RESUME_ARG"
-
-echo "Executing command:"
-echo "$CMD"
-
-eval "$CMD"
+  $RESUME_ARG
 
 echo "Training Finished!"
