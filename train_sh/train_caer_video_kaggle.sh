@@ -36,8 +36,8 @@ python main.py \
   --lr 2e-5 \
   --lr-image-encoder 1e-6 \
   --lr-prompt-learner 2e-4 \
-  --lr-adapter 1e-4 \
-  --weight-decay 0.05 \
+  --lr-adapter 5e-5 \
+  --weight-decay 0.2 \
   --temporal-layers 1 \
   --num-segments 8 \
   --duration 1 \
