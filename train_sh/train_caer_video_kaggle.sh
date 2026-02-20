@@ -8,8 +8,8 @@
 DATASET_ROOT="/kaggle/input/datasets/harinath07/caer-data/CAER"
 ANN_DIR="$(pwd)/caer_video_annotations"
 
-# 2. Transfer Learning: Use Best RAER Model (Found in Git Repo)
-RESUME_PATH="$(pwd)/outputs/Ablation-RAER-FULL_fix_parameter_fullface_train_test-[02-15]-[07:38]/model_best.pth"
+# 2. Transfer Learning: Use Best RAER Model (Found in Kaggle Input)
+RESUME_PATH="/kaggle/input/datasets/mngochocsupham/model-path/Ablation-RAER-FULL_fix_parameter_fullface_train_test-[02-15]-[07:38]/model_best.pth"
 
 echo "Checking annotation directory: $ANN_DIR"
 ls -lh "$ANN_DIR"
