@@ -301,11 +301,24 @@ def run_training(args: argparse.Namespace) -> None:
             start_epoch = checkpoint['epoch']
             best_val_uar = checkpoint.get('best_acc', 0.0)
             
-            # Use strict=False to allow loading older checkpoints into the new model (e.g., when adding MoCo)
-            msg = model.load_state_dict(checkpoint['state_dict'], strict=False)
+            # Filter out mismatched sizes for Transfer Learning (e.g., 5 classes -> 7 classes)
+            state_dict = checkpoint['state_dict']
+            model_dict = model.state_dict()
+            
+            filtered_state_dict = {}
+            for k, v in state_dict.items():
+                if k in model_dict:
+                    if v.shape == model_dict[k].shape:
+                        filtered_state_dict[k] = v
+                    else:
+                        print(f"=> Skipping {k} due to size mismatch: {v.shape} vs {model_dict[k].shape}")
+                else:
+                    print(f"=> Skipping {k} because it is not in the current model.")
+            
+            msg = model.load_state_dict(filtered_state_dict, strict=False)
             print(f"=> Load result: {msg}")
             
-            if 'optimizer' in checkpoint and not args.use_moco: # Skip optimizer resume if architecture changed significantly
+            if 'optimizer' in checkpoint and not args.use_moco:
                 try:
                     optimizer.load_state_dict(checkpoint['optimizer'])
                 except:
