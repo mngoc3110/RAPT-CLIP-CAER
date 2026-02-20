@@ -81,6 +81,7 @@ class VideoDataset(data.Dataset):
         num_classes=8,
         label_shift=0,           # IMPORTANT: CAER-S labels are 0..6 => label_shift=0
         bbox_prefix="CAER",      # IMPORTANT: your bbox keys are CAER/<rel_no_ext>
+        balance_data=False,      # Internal oversampling
     ):
         self.list_file = list_file
         self.duration = duration
@@ -92,6 +93,7 @@ class VideoDataset(data.Dataset):
         self.bounding_box_body = bounding_box_body
         self.crop_body = crop_body
         self.root_dir = root_dir
+        self.balance_data = balance_data
 
         self.label_shift = int(label_shift)
         self.bbox_prefix = bbox_prefix
@@ -233,6 +235,27 @@ class VideoDataset(data.Dataset):
                     continue
 
                 self.sample_list.append([path, num_frames, label])
+
+        # Internal Oversampling for Minority Classes (if mode is train)
+        if self.mode == "train" and self.balance_data:
+            print("=> Applying internal oversampling to balance dataset...")
+            labels = [int(x[2]) for x in self.sample_list]
+            unique_labels = sorted(list(set(labels)))
+            label_counts = {lbl: labels.count(lbl) for lbl in unique_labels}
+            max_count = max(label_counts.values())
+            
+            balanced_list = []
+            for lbl in unique_labels:
+                samples_of_label = [x for x in self.sample_list if int(x[2]) == lbl]
+                count = len(samples_of_label)
+                if count == 0: continue
+                # Multiply samples to reach close to max_count (capped to avoid massive dataset)
+                multiplier = min(int(max_count / count), 4) # cap at 4x increase
+                balanced_list.extend(samples_of_label * multiplier)
+            
+            self.sample_list = balanced_list
+            random.shuffle(self.sample_list)
+            print(f"=> Dataset balanced. New size: {len(self.sample_list)}")
 
     def _parse_list(self):
         self.video_list = [
