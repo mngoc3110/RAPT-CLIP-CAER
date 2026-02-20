@@ -306,23 +306,29 @@ def run_training(args: argparse.Namespace) -> None:
             model_dict = model.state_dict()
             
             filtered_state_dict = {}
+            has_mismatch = False
             for k, v in state_dict.items():
                 if k in model_dict:
                     if v.shape == model_dict[k].shape:
                         filtered_state_dict[k] = v
                     else:
                         print(f"=> Skipping {k} due to size mismatch: {v.shape} vs {model_dict[k].shape}")
+                        has_mismatch = True
                 else:
                     print(f"=> Skipping {k} because it is not in the current model.")
             
             msg = model.load_state_dict(filtered_state_dict, strict=False)
             print(f"=> Load result: {msg}")
             
-            if 'optimizer' in checkpoint and not args.use_moco:
+            # If we had mismatches (Transfer Learning), DO NOT load optimizer state
+            if 'optimizer' in checkpoint and not args.use_moco and not has_mismatch:
                 try:
                     optimizer.load_state_dict(checkpoint['optimizer'])
+                    print("=> Optimizer state resumed.")
                 except:
                     print("=> Warning: Could not resume optimizer state.")
+            elif has_mismatch:
+                print("=> Transfer Learning detected (size mismatch). Starting optimizer from scratch.")
             
             if 'recorder' in checkpoint:
                 recorder = checkpoint['recorder']
