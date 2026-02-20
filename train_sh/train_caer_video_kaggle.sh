@@ -41,8 +41,8 @@ python main.py \
   --lr 2e-5 \
   --lr-image-encoder 1e-6 \
   --lr-prompt-learner 2e-4 \
-  --lr-adapter 5e-5 \
-  --weight-decay 0.2 \
+  --lr-adapter 1e-4 \
+  --weight-decay 0.1 \
   --temporal-layers 1 \
   --num-segments 8 \
   --duration 1 \
@@ -61,7 +61,7 @@ python main.py \
   --load_and_tune_prompt_learner True \
   --loss-type ldam \
   --ldam-max-m 0.5 \
-  --ldam-s 40.0 \
+  --ldam-s 50.0 \
   --lambda_mi 0.1 \
   --lambda_dc 0.1 \
   --label-smoothing 0.1 \
