@@ -6,17 +6,17 @@
 # =========================================================================================
 
 # Adjust this to where the dataset is located on Kaggle
-DATASET_ROOT="/kaggle/input/caer-data/CAER"
+DATASET_ROOT="/kaggle/input/datasets/harinath07/caer-data/CAER"
 # Use absolute path for annotations to avoid FileNotFoundError
 ANN_DIR="$(pwd)/caer_video_annotations"
 
+# [OPTIONAL] Resume from a checkpoint (e.g., from Epoch 5)
+# Set this to the path of your checkpoint file on Kaggle.
+# Leave empty ("") to start from scratch.
+RESUME_PATH="/kaggle/input/datasets/mngochocsupham/model-caer/model_caer_video.pth"
+
 echo "Checking annotation directory: $ANN_DIR"
 ls -lh "$ANN_DIR"
-
-# [OPTIONAL] Resume from a checkpoint (e.g., from Epoch 5)
-# Set this to the path of your checkpoint file on Kaggle (e.g., /kaggle/working/outputs/.../model.pth)
-# Leave empty to start from scratch.
-RESUME_PATH=""
 
 echo "Starting CAER Video Training on Kaggle..."
 echo "Dataset Root: $DATASET_ROOT"
@@ -29,7 +29,7 @@ else
   RESUME_ARG=""
 fi
 
-python main.py \
+CMD="python main.py \
   --mode train \
   --exper-name CAER_VIDEO_FULL \
   --dataset CAER \
@@ -48,11 +48,11 @@ python main.py \
   --image-size 224 \
   --seed 42 \
   --print-freq 50 \
-  --root-dir "$DATASET_ROOT" \
-  --train-annotation "$ANN_DIR/train.txt" \
-  --val-annotation "$ANN_DIR/validation.txt" \
-  --test-annotation "$ANN_DIR/test.txt" \
-  --bounding-box-face "$ANN_DIR/caer_video_faces.json" \
+  --root-dir $DATASET_ROOT \
+  --train-annotation $ANN_DIR/train.txt \
+  --val-annotation $ANN_DIR/validation.txt \
+  --test-annotation $ANN_DIR/test.txt \
+  --bounding-box-face $ANN_DIR/caer_video_faces.json \
   --text-type prompt_ensemble \
   --contexts-number 8 \
   --class-token-position end \
@@ -66,6 +66,11 @@ python main.py \
   --label-smoothing 0.1 \
   --use-amp \
   --grad-clip 1.0 \
-  $RESUME_ARG
+  $RESUME_ARG"
+
+echo "Executing command:"
+echo "$CMD"
+
+eval "$CMD"
 
 echo "Training Finished!"
