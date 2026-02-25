@@ -40,6 +40,9 @@ class GenerateModel(nn.Module):
         elif args.dataset == "DAiSEE":
             from models.Text import class_descriptor_daisee
             hand_crafted_prompts = class_descriptor_daisee
+        elif args.dataset in ["CAER", "CAER-S"]:
+            from models.Text import class_descriptor_caer
+            hand_crafted_prompts = class_descriptor_caer
         else:
             # Fallback to some generic or 7-class descriptors if available
             from models.Text import class_descriptor_7_only_face

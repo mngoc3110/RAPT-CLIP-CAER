@@ -168,12 +168,20 @@ class CAERSDataset(data.Dataset):
             print(f"Error loading {path}: {e}")
             img = Image.new('RGB', (self.image_size, self.image_size))
 
-        # 1. Body/Context Image (Full Image)
-        img_body = img
-        
         # 2. Face Image (JSON Bbox or Heuristic Center Crop)
         # This differentiates the input to the Face Adapter from the Body input
         img_face = self._get_face_crop(img, rel_path)
+
+        # 1. Body/Context Image (Full Image with face masked out if bbox available)
+        img_body = img.copy() # copy to avoid modifying original if needed elsewhere
+        from PIL import ImageDraw
+        if rel_path in self.bboxes:
+            try:
+                x1, y1, x2, y2 = self.bboxes[rel_path]
+                draw = ImageDraw.Draw(img_body)
+                draw.rectangle((x1, y1, x2, y2), fill=(0, 0, 0))
+            except Exception as e:
+                pass # Fallback to unmasked if bbox is invalid
         
         # Apply transforms
         # Result is (C, H, W)

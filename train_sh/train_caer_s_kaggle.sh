@@ -1,23 +1,21 @@
 #!/bin/bash
 
-# Configuration for Kaggle Environment
-# Assuming dataset is mounted at: /kaggle/input/datasets/lcngtr/caer-s
-# Assuming this repo is cloned to: /kaggle/working/RAPT-CLIP-CAER
-# Assuming annotations are uploaded/generated at: /kaggle/working/RAPT-CLIP-CAER/caer_s_annotations
+# Configuration for Local/Kaggle Environment
+# Assuming dataset is in the project root: ./CAER-S
+# Assuming annotations are at: ./CAER-S/annotations
 
-DATASET_ROOT="/kaggle/input/datasets/lcngtr/caer-s"
-# Adjust this path if your annotations are elsewhere (e.g. /kaggle/input/my-annotations)
-ANN_DIR="./caer_s_annotations"
+DATASET_ROOT="./CAER-S"
+ANN_DIR="./CAER-S/annotations"
 
-echo "Starting CAER-S Training on Kaggle..."
+echo "Starting CAER-S Training..."
 echo "Dataset Root: $DATASET_ROOT"
 echo "Annotations: $ANN_DIR"
 
 python main.py \
   --mode train \
-  --exper-name CAER_S_KAGGLE \
+  --exper-name CAER_S_MASKED_CONTEXT \
   --dataset CAER-S \
-  --gpu 0 \
+  --gpu mps \
   --epochs 20 \
   --batch-size 32 \
   --optimizer AdamW \
@@ -33,8 +31,8 @@ python main.py \
   --seed 42 \
   --print-freq 50 \
   --root-dir "$DATASET_ROOT" \
-  --train-annotation "$ANN_DIR/train.txt" \
-  --val-annotation "$ANN_DIR/test.txt" \
+  --train-annotation "$ANN_DIR/train_small.txt" \
+  --val-annotation "$ANN_DIR/validation.txt" \
   --test-annotation "$ANN_DIR/test.txt" \
   --bounding-box-face "$ANN_DIR/caer_s_faces.json" \
   --text-type prompt_ensemble \
@@ -50,7 +48,6 @@ python main.py \
   --dc-warmup 5 \
   --dc-ramp 10 \
   --label-smoothing 0.05 \
-  --use-amp \
   --crop-body \
   --grad-clip 1.0
 

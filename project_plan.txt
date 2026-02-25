@@ -9,12 +9,15 @@
 
 3. Implementation Plan:
    - [x] Create `check_dataset_structure.py` to verify image counts.
+   - [x] Implement `dataloader/caer_s_dataloader.py` for static images.
+     - [x] Support T=1 dimension for the model.
+     - [x] Integrate `caer_s_faces.json` for precise face cropping.
+     - [x] **[NEW] Added Face Masking:** Masks out facial regions in the Context stream (inspired by CAER-Net) to force focus on body/background.
+   - [x] Create `fix_missing_bboxes.py` to fill 3.6% missing face coordinates using MediaPipe.
+   - [x] Clone and analyze `ndkhanh360/CAER` repository for SOTA techniques.
+   - [ ] Run `fix_missing_bboxes.py` to ensure 100% coverage.
    - [ ] Update `main.py` to save best model based on WAR (Accuracy).
-   - [ ] Implement `dataloader/caer_s_dataloader.py` for static images.
-     - Needs to handle T=1 dimension for the model.
-     - Needs to generate 'face' and 'body' inputs (using full image for both if no crop provided).
-   - [ ] Update `train_sh/train_caer_s.sh` script.
-   - [ ] Run `check_dataset_structure.py` (User needs to provide path).
+   - [ ] Update `train_sh/train_caer_s.sh` script with optimized hyperparameters.
 
 4. Current Status:
    - Codebase analyzed.
